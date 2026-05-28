@@ -384,6 +384,51 @@ async function handleApi(req, res, url) {
       return true;
     }
 
+    if (url.pathname === "/api/admin/toggle-user") {
+      const adminCore = require("./api/_adminCore");
+      const { adminToken, uid, disabled } = await readBody(req);
+      if (!adminCore.verifyAdminToken(adminToken)) {
+        sendJson(res, 401, { error: "관리자 인증이 필요합니다." });
+        return true;
+      }
+      try {
+        sendJson(res, 200, await adminCore.setUserDisabled(uid, Boolean(disabled)));
+      } catch (error) {
+        sendJson(res, 500, { error: error.message || "Server error" });
+      }
+      return true;
+    }
+
+    if (url.pathname === "/api/admin/delete-user") {
+      const adminCore = require("./api/_adminCore");
+      const { adminToken, uid } = await readBody(req);
+      if (!adminCore.verifyAdminToken(adminToken)) {
+        sendJson(res, 401, { error: "관리자 인증이 필요합니다." });
+        return true;
+      }
+      try {
+        sendJson(res, 200, await adminCore.deleteUser(uid));
+      } catch (error) {
+        sendJson(res, 500, { error: error.message || "Server error" });
+      }
+      return true;
+    }
+
+    if (url.pathname === "/api/admin/reset-link") {
+      const adminCore = require("./api/_adminCore");
+      const { adminToken, email } = await readBody(req);
+      if (!adminCore.verifyAdminToken(adminToken)) {
+        sendJson(res, 401, { error: "관리자 인증이 필요합니다." });
+        return true;
+      }
+      try {
+        sendJson(res, 200, await adminCore.createPasswordResetLink(email));
+      } catch (error) {
+        sendJson(res, 500, { error: error.message || "Server error" });
+      }
+      return true;
+    }
+
     if (url.pathname === "/api/fortune") {
       const { birthday } = await readBody(req);
       const urlTemplate = process.env.FORTUNE_API_URL;

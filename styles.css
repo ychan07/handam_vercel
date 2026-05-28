@@ -94,22 +94,58 @@ body{
   background:var(--accent-soft);font-size:13px;font-weight:700;
   line-height:1.55;color:var(--text-soft);
 }
-.recaptcha-wrap{
-  min-height:78px;margin-top:8px;display:flex;justify-content:center;
-  overflow:hidden;border-radius:12px;background:var(--surface-2);
-  border:1px solid var(--border);padding:8px 4px;
+.admin-page .auth-pad{padding-bottom:40px}
+.admin-hero{display:flex;align-items:flex-start;gap:12px;padding:12px 0 18px}
+.admin-hero .h-page{font-size:22px}
+.admin-hint{
+  padding:12px 14px;border-radius:14px;font-size:12px;font-weight:700;
+  line-height:1.55;margin:12px 0;
 }
-.admin-stat-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
-.admin-stat{padding:16px;text-align:center}
-.admin-stat-num{font-size:30px;font-weight:800;margin-top:8px;color:var(--accent)}
-.admin-user-row{
-  display:flex;flex-direction:column;gap:10px;
-  padding:14px 12px;border-bottom:1px solid var(--line);
+.admin-hint.warn{background:#FBEAD0;color:#8A5A12}
+.admin-hint.info{background:var(--accent-soft);color:var(--text-soft)}
+[data-theme="dark"] .admin-hint.warn{background:#3A2F18;color:#E0B45E}
+.admin-stat-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:8px}
+.admin-stat-card{
+  background:var(--surface);border:1px solid var(--border);border-radius:18px;
+  padding:14px 12px;box-shadow:var(--shadow);position:relative;overflow:hidden;
 }
-.admin-user-row:last-child{border-bottom:0}
-.admin-user-actions{display:flex;gap:8px;align-items:center}
-.admin-reset-input{flex:1;min-width:0;padding:10px 12px;font-size:13px}
-.admin-reset-btn{flex:0 0 auto;width:auto;padding:10px 14px;font-size:12px}
+.admin-stat-card.accent{border-color:var(--accent-soft);background:linear-gradient(145deg,var(--surface),var(--accent-soft))}
+.admin-stat-card.warn{border-color:#F3C9C2}
+.admin-stat-card i{font-size:14px;color:var(--accent);opacity:.85;margin-bottom:8px;display:block}
+.admin-stat-card.warn i{color:#BC5743}
+.admin-stat-num{font-size:26px;font-weight:800;line-height:1.1;color:var(--text)}
+.admin-stat-label{font-size:10px;font-weight:800;color:var(--text-muted);margin-top:5px;letter-spacing:.02em}
+.admin-toolbar{display:flex;gap:8px;align-items:center;margin-top:14px;flex-wrap:wrap}
+.admin-search{flex:1;min-width:140px;padding:12px 14px;font-size:14px}
+.admin-filter{flex:0 0 110px;padding:12px 8px;font-size:12px}
+.admin-mini-btn{width:auto;flex:0 0 auto;padding:11px 14px;font-size:12px}
+.admin-user-list{display:flex;flex-direction:column;gap:10px;margin-top:12px}
+.admin-user-card{
+  background:var(--surface);border:1px solid var(--border);border-radius:18px;
+  padding:14px;box-shadow:var(--shadow);
+}
+.admin-user-head{display:flex;gap:12px}
+.admin-user-avatar{
+  width:44px;height:44px;border-radius:14px;flex-shrink:0;
+  background:var(--grad-fortune);color:#fff;display:flex;align-items:center;
+  justify-content:center;font-size:18px;font-weight:800;
+}
+.admin-user-meta{flex:1;min-width:0}
+.admin-user-name{font-size:15px;font-weight:800}
+.admin-user-email{font-size:12px;font-weight:600;color:var(--text-muted);margin-top:2px;word-break:break-all}
+.admin-user-tags{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+.admin-user-dates{font-size:10px;font-weight:700;color:var(--text-muted);margin-top:8px}
+.admin-user-tools{display:flex;flex-wrap:wrap;gap:6px;margin-top:12px;padding-top:12px;border-top:1px solid var(--line)}
+.admin-reset-input{flex:1 1 100%;padding:10px 12px;font-size:13px;margin-bottom:2px}
+.admin-tool-btn{
+  border:1px solid var(--border);background:var(--surface-2);border-radius:12px;
+  padding:8px 11px;font-family:inherit;font-size:11px;font-weight:800;
+  color:var(--text-soft);cursor:pointer;display:inline-flex;align-items:center;gap:5px;
+}
+.admin-tool-btn:active{transform:scale(.97)}
+.admin-tool-btn.danger{color:#BC5743;border-color:#F3C9C2;background:#FFF6F4}
+[data-theme="dark"] .admin-tool-btn.danger{background:#3A241E}
+.admin-empty{padding:24px 16px;text-align:center;font-size:13px;font-weight:700;color:var(--text-muted)}
 input,textarea,select{font-size:16px}
 
 /* ===== Reveal animation ===== */

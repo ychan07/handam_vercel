@@ -10,8 +10,6 @@ import {
   updatePassword,
   updateProfile,
   sendPasswordResetEmail,
-  RecaptchaVerifier,
-  signInWithPhoneNumber,
   EmailAuthProvider,
   reauthenticateWithCredential,
   GoogleAuthProvider,
@@ -44,12 +42,10 @@ const state = {
   admin: null,
   fortuneScore: 95,
   selectedPrompt: "",
-  phoneConfirmation: null,
+  adminUsers: [],
 };
 const googleProvider = new GoogleAuthProvider();
 const AUTH_PAGES = new Set(["login", "signup", "find-account", "admin"]);
-let recaptchaLogin = null;
-let recaptchaSignup = null;
 let presenceTimer = null;
 let dbWorker, workerSeq = 0;
 const workerWaiters = new Map();
@@ -103,19 +99,9 @@ function getDisplayName() {
   if (p?.displayName) return p.displayName;
   const user = auth.currentUser;
   if (user?.displayName) return user.displayName;
-  const phone = p?.phone || user?.phoneNumber || state.auth?.phone;
-  if (phone) return phone.replace(/^\+82/, "0");
   const email = state.auth?.email || user?.email || "";
   if (email.includes("@")) return email.split("@")[0];
   return "한담";
-}
-function normalizePhoneKR(input) {
-  const digits = String(input || "").replace(/\D/g, "");
-  if (!digits) return "";
-  if (digits.startsWith("82")) return `+${digits}`;
-  if (digits.startsWith("0")) return `+82${digits.slice(1)}`;
-  if (digits.length >= 9 && digits.length <= 11) return `+82${digits}`;
-  return `+${digits}`;
 }
 function formatPhoneDisplay(e164) {
   if (!e164) return "";
@@ -126,45 +112,8 @@ function formatPhoneDisplay(e164) {
   }
   return e164;
 }
-function resetRecaptcha(instance) {
-  if (!instance) return null;
-  try { instance.clear(); } catch (_e) {}
-  return null;
-}
-async function ensureRecaptcha(containerId, refKey) {
-  const el = document.getElementById(containerId);
-  if (!el) throw new Error("reCAPTCHA 컨테이너를 찾을 수 없습니다.");
-  el.innerHTML = "";
-  if (refKey === "login") recaptchaLogin = resetRecaptcha(recaptchaLogin);
-  else recaptchaSignup = resetRecaptcha(recaptchaSignup);
-  const verifier = new RecaptchaVerifier(auth, el, {
-    size: "normal",
-    callback: () => {},
-    "expired-callback": () => showToast("reCAPTCHA가 만료되었어요. 다시 시도해주세요."),
-  });
-  await verifier.render();
-  if (refKey === "login") recaptchaLogin = verifier;
-  else recaptchaSignup = verifier;
-  return verifier;
-}
-async function preparePhoneRecaptcha(prefix) {
-  const containerId = prefix === "login" ? "recaptcha-login" : "recaptcha-signup";
-  try {
-    await ensureRecaptcha(containerId, prefix);
-  } catch (error) {
-    console.warn("reCAPTCHA 준비 실패:", error);
-  }
-}
-function setAuthMode(mode, prefix) {
-  const emailPanel = document.getElementById(`${prefix}-panel-email`);
-  const phonePanel = document.getElementById(`${prefix}-panel-phone`);
-  const otpPanel = document.getElementById(`${prefix}-panel-otp`);
-  if (emailPanel) emailPanel.style.display = mode === "email" ? "block" : "none";
-  if (phonePanel) phonePanel.style.display = mode === "phone" && !state.phoneConfirmation ? "block" : "none";
-  if (otpPanel) otpPanel.style.display = mode === "phone" && state.phoneConfirmation ? "block" : "none";
-  document.querySelectorAll(`[data-auth-mode="${prefix}"]`).forEach((btn) => {
-    btn.classList.toggle("on", btn.dataset.mode === mode);
-  });
+function getAppPublicUrl() {
+  return window.location.origin.replace(/\/$/, "");
 }
 function adminHeaders() {
   return state.admin?.token ? { "Content-Type": "application/json", "X-Admin-Token": state.admin.token } : { "Content-Type": "application/json" };
@@ -273,36 +222,10 @@ function authErrorMessage(error, context = {}) {
   }
   if (code === "auth/popup-closed-by-user") return "로그인 창이 닫혔어요. 다시 시도해주세요.";
   if (code === "auth/operation-not-allowed") {
-    if (context.provider === "phone") {
-      return "전화 로그인이 막혀 있어요. Firebase Console > Authentication > 로그인 방법 > 전화 '사용 설정' 확인, 그리고 Blaze(종량제) 요금제 업그레이드가 필요할 수 있어요.";
-    }
     return "해당 로그인 방식이 비활성화되어 있어요. Firebase Console에서 활성화해주세요.";
   }
-  if (code === "auth/invalid-app-credential" || message.includes("INVALID_APP_CREDENTIAL")) {
-    return "앱 인증(reCAPTCHA) 오류예요. Authentication > 설정 > 승인된 도메인에 localhost와 배포 도메인을 추가한 뒤, reCAPTCHA 체크박스를 먼저 눌러주세요.";
-  }
-  if (code === "auth/invalid-phone-number") return "전화번호 형식을 확인해주세요. (예: 01012345678)";
   if (code === "auth/too-many-requests") return "요청이 너무 많아요. 잠시 후 다시 시도해주세요.";
-  if (code === "auth/invalid-verification-code") return "인증번호가 올바르지 않아요.";
-  if (code === "auth/code-expired") return "인증번호가 만료되었어요. 다시 요청해주세요.";
-  if (code === "auth/captcha-check-failed" || code === "auth/missing-app-credential") {
-    return "reCAPTCHA 확인이 필요해요. '로봇이 아닙니다' 체크 후 다시 인증번호 받기를 눌러주세요.";
-  }
-  if (message.includes("BILLING_NOT_ENABLED") || message.includes("billing")) {
-    return "전화 인증은 Firebase Blaze(종량제) 요금제가 필요해요. Console > 사용량 및 결제에서 업그레이드해주세요.";
-  }
   return message || "인증 처리에 실패했어요.";
-}
-function bindAuthModeTabs() {
-  document.querySelectorAll("[data-auth-mode]").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      const prefix = btn.dataset.authMode;
-      const mode = btn.dataset.mode;
-      state.phoneConfirmation = null;
-      setAuthMode(mode, prefix);
-      if (mode === "phone") preparePhoneRecaptcha(prefix);
-    });
-  });
 }
 
 function go(id) {
@@ -452,77 +375,6 @@ async function login() {
     showToast(authErrorMessage(error));
   }
 }
-async function sendLoginPhoneOtp() {
-  const phone = normalizePhoneKR(document.getElementById("login-phone").value.trim());
-  if (!phone) return showToast("전화번호를 입력해주세요.");
-  try {
-    const verifier = await ensureRecaptcha("recaptcha-login", "login");
-    state.phoneConfirmation = await signInWithPhoneNumber(auth, phone, verifier);
-    setAuthMode("phone", "login");
-    showToast("인증번호를 발송했어요.");
-  } catch (error) {
-    console.error("전화 로그인 오류:", error?.code, error?.message);
-    showToast(authErrorMessage(error, { provider: "phone" }));
-  }
-}
-async function verifyLoginPhoneOtp() {
-  const code = document.getElementById("login-otp").value.trim();
-  if (!code || !state.phoneConfirmation) return showToast("인증번호를 입력해주세요.");
-  try {
-    const credential = await state.phoneConfirmation.confirm(code);
-    state.phoneConfirmation = null;
-    await setAuthFromUser(credential.user);
-    saveProfile(credential.user.uid, {
-      phone: credential.user.phoneNumber,
-      displayName: getDisplayName(),
-    });
-    showToast("전화번호 로그인 성공");
-    go("home");
-  } catch (error) {
-    showToast(authErrorMessage(error));
-  }
-}
-async function sendSignupPhoneOtp() {
-  const displayName = (document.getElementById("signup-name-phone")?.value || document.getElementById("signup-name")?.value || "").trim();
-  const phoneRaw = document.getElementById("signup-phone-auth").value.trim();
-  const phone = normalizePhoneKR(phoneRaw);
-  if (!displayName) return showToast("이름을 입력해주세요.");
-  if (!phone) return showToast("전화번호를 입력해주세요.");
-  try {
-    const verifier = await ensureRecaptcha("recaptcha-signup", "signup");
-    state.phoneConfirmation = await signInWithPhoneNumber(auth, phone, verifier);
-    sessionStorage.setItem("handam-pending-name", displayName);
-    setAuthMode("phone", "signup");
-    const otpPanel = document.getElementById("signup-panel-otp");
-    const phonePanel = document.getElementById("signup-panel-phone");
-    if (otpPanel) otpPanel.style.display = "block";
-    if (phonePanel) phonePanel.style.display = "none";
-    showToast("인증번호를 발송했어요.");
-  } catch (error) {
-    console.error("전화 가입 오류:", error?.code, error?.message);
-    showToast(authErrorMessage(error, { provider: "phone" }));
-  }
-}
-async function verifySignupPhoneOtp() {
-  const code = document.getElementById("signup-otp").value.trim();
-  if (!code || !state.phoneConfirmation) return showToast("인증번호를 입력해주세요.");
-  try {
-    const credential = await state.phoneConfirmation.confirm(code);
-    const displayName = sessionStorage.getItem("handam-pending-name") || "한담";
-    await updateProfile(credential.user, { displayName });
-    saveProfile(credential.user.uid, {
-      displayName,
-      phone: credential.user.phoneNumber,
-    });
-    state.phoneConfirmation = null;
-    sessionStorage.removeItem("handam-pending-name");
-    await setAuthFromUser(credential.user);
-    showToast(`${displayName}님, 가입을 환영해요!`);
-    go("home");
-  } catch (error) {
-    showToast(authErrorMessage(error));
-  }
-}
 async function registerFromSignup() {
   const displayName = document.getElementById("signup-name").value.trim();
   const email = document.getElementById("signup-email").value.trim();
@@ -547,10 +399,20 @@ async function registerFromSignup() {
 async function sendPasswordReset() {
   const email = document.getElementById("find-email").value.trim();
   if (!email) return showToast("가입 시 사용한 이메일을 입력해주세요.");
+  const result = document.getElementById("find-reset-result");
   try {
-    await sendPasswordResetEmail(auth, email);
-    showToast("비밀번호 재설정 메일을 보냈어요. 메일함을 확인해주세요.");
+    await sendPasswordResetEmail(auth, email, {
+      url: getAppPublicUrl() + "/",
+      handleCodeInApp: false,
+    });
+    if (result) {
+      result.style.display = "block";
+      result.innerHTML =
+        "<strong>메일을 보냈어요.</strong><br>받은편지함과 <b>스팸함</b>을 모두 확인해주세요. 발신: noreply@handam-981b6.firebaseapp.com<br><br>메일이 없으면 관리자에게 문의하거나, 관리자 페이지에서 비밀번호를 직접 초기화할 수 있어요.";
+    }
+    showToast("재설정 메일을 보냈어요. 스팸함도 확인해주세요.");
   } catch (error) {
+    if (result) result.style.display = "none";
     showToast(authErrorMessage(error));
   }
 }
@@ -589,7 +451,7 @@ async function logout() {
   state.auth = null;
   state.profile = null;
   state.admin = null;
-  state.phoneConfirmation = null;
+  state.adminUsers = [];
   localStorage.removeItem("handam-auth");
   sessionStorage.removeItem("handam-admin");
   stopPresenceHeartbeat();
@@ -604,21 +466,73 @@ function adminLogout() {
   showToast("관리자 로그아웃했어요.");
   go("login");
 }
+function formatAdminDate(iso) {
+  if (!iso) return "-";
+  const d = new Date(iso);
+  return `${d.getMonth() + 1}/${d.getDate()} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+}
+function getFilteredAdminUsers() {
+  const q = (document.getElementById("admin-search")?.value || "").trim().toLowerCase();
+  const filter = document.getElementById("admin-filter")?.value || "all";
+  return state.adminUsers.filter((user) => {
+    if (filter === "active" && !user.active) return false;
+    if (filter === "disabled" && !user.disabled) return false;
+    if (filter === "online" && !user.active) return false;
+    if (!q) return true;
+    const hay = `${user.displayName || ""} ${user.email || ""} ${user.uid}`.toLowerCase();
+    return hay.includes(q);
+  });
+}
+function exportAdminUsersCsv() {
+  const users = getFilteredAdminUsers();
+  const header = ["uid", "displayName", "email", "disabled", "active", "createdAt", "lastSignIn", "providers"];
+  const lines = [header.join(",")];
+  users.forEach((u) => {
+    lines.push(
+      [
+        u.uid,
+        `"${(u.displayName || "").replace(/"/g, '""')}"`,
+        u.email || "",
+        u.disabled,
+        u.active,
+        u.createdAt || "",
+        u.lastSignIn || "",
+        `"${(u.providers || []).join("|")}"`,
+      ].join(",")
+    );
+  });
+  const blob = new Blob(["\uFEFF" + lines.join("\n")], { type: "text/csv;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `handam-users-${Date.now()}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+  showToast("유저 목록 CSV를 저장했어요.");
+}
 async function loadAdminDashboard() {
   if (!state.admin?.token) return go("login");
+  const adminName = document.getElementById("admin-username-label");
+  if (adminName) adminName.textContent = state.admin.username || "admin";
   try {
     const stats = await adminApi("/api/admin/stats");
-    document.getElementById("admin-total-users").textContent = String(stats.totalUsers ?? 0);
-    document.getElementById("admin-active-users").textContent = String(stats.activeUsers ?? 0);
-    document.getElementById("admin-active-window").textContent = String(stats.activeWindowMinutes ?? 15);
+    const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = String(v ?? 0); };
+    set("admin-total-users", stats.totalUsers);
+    set("admin-active-users", stats.activeUsers);
+    set("admin-disabled-users", stats.disabledUsers);
+    set("admin-email-users", stats.emailUsers);
+    set("admin-active-window", stats.activeWindowMinutes ?? 15);
     const hint = document.getElementById("admin-firebase-hint");
     if (hint) {
       if (!stats.firebaseConfigured) {
-        hint.textContent = "FIREBASE_SERVICE_ACCOUNT 환경 변수를 설정하면 유저 목록·비밀번호 초기화가 활성화됩니다.";
+        hint.textContent = "FIREBASE_SERVICE_ACCOUNT 환경 변수를 설정하면 유저 관리 기능이 활성화됩니다.";
+        hint.className = "admin-hint warn";
         hint.style.display = "block";
       } else if (stats.firestoreEnabled === false) {
-        hint.textContent =
-          "Firestore가 아직 활성화되지 않았어요. 유저 목록은 표시되지만, 실시간 활동 추적은 최근 로그인 시간 기준으로 표시됩니다. Firebase Console에서 Firestore를 켜면 더 정확해져요.";
+        hint.textContent = "Firestore 미연동 · 활동 중 유저는 최근 로그인 기준으로 표시됩니다.";
+        hint.className = "admin-hint info";
         hint.style.display = "block";
       } else {
         hint.style.display = "none";
@@ -631,56 +545,108 @@ async function loadAdminDashboard() {
 }
 async function renderAdminUsers() {
   const box = document.getElementById("admin-user-list");
+  const countEl = document.getElementById("admin-list-count");
   if (!box) return;
-  box.innerHTML = '<div class="muted" style="padding:16px;font-weight:700">불러오는 중…</div>';
+  box.innerHTML = '<div class="admin-empty">불러오는 중…</div>';
   try {
     const data = await adminApi("/api/admin/users");
-    const users = data.users || [];
-    if (!users.length) {
-      box.innerHTML = '<div class="muted" style="padding:16px;font-weight:700">등록된 사용자가 없습니다.</div>';
-      return;
-    }
-    box.innerHTML = "";
-    users.forEach((user) => {
-      const row = document.createElement("div");
-      row.className = "admin-user-row";
-      const label = user.displayName || user.email || formatPhoneDisplay(user.phone) || user.uid;
-      const contact = user.email || formatPhoneDisplay(user.phone) || "-";
-      const canResetPassword = Boolean(user.email);
-      row.innerHTML = `
-        <div class="admin-user-main">
-          <div style="font-size:14px;font-weight:800">${label}</div>
-          <div class="muted" style="font-size:11px;font-weight:600;margin-top:3px">${contact}</div>
-          <div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap">
-            <span class="chip ${user.active ? "emo-calm" : ""}">${user.active ? "활동 중" : "비활성"}</span>
-            <span class="chip">${(user.providers || []).join(", ") || "provider 없음"}</span>
+    state.adminUsers = data.users || [];
+    paintAdminUserList();
+    if (countEl) countEl.textContent = `${getFilteredAdminUsers().length}명 표시`;
+  } catch (error) {
+    box.innerHTML = `<div class="admin-empty">${error.message || "목록 로드 실패"}</div>`;
+  }
+}
+function paintAdminUserList() {
+  const box = document.getElementById("admin-user-list");
+  const countEl = document.getElementById("admin-list-count");
+  if (!box) return;
+  const users = getFilteredAdminUsers();
+  if (countEl) countEl.textContent = `${users.length}명 표시`;
+  if (!users.length) {
+    box.innerHTML = '<div class="admin-empty">조건에 맞는 사용자가 없습니다.</div>';
+    return;
+  }
+  box.innerHTML = "";
+  users.forEach((user) => {
+    const label = user.displayName || user.email?.split("@")[0] || "유저";
+    const initial = label.slice(0, 1);
+    const row = document.createElement("article");
+    row.className = "admin-user-card";
+    row.innerHTML = `
+      <div class="admin-user-head">
+        <div class="admin-user-avatar">${initial}</div>
+        <div class="admin-user-meta">
+          <div class="admin-user-name">${label}</div>
+          <div class="admin-user-email">${user.email || "이메일 없음"}</div>
+          <div class="admin-user-tags">
+            <span class="chip ${user.active ? "emo-calm" : ""}">${user.active ? "활동 중" : "오프라인"}</span>
+            ${user.disabled ? '<span class="chip emo-excited">정지됨</span>' : ""}
+            <span class="chip">${(user.providers || []).map((p) => p.replace(".com", "")).join(" · ") || "—"}</span>
+          </div>
+          <div class="admin-user-dates">
+            가입 ${formatAdminDate(user.createdAt)} · 최근 ${formatAdminDate(user.lastSignIn)}
           </div>
         </div>
-        ${canResetPassword ? `<div class="admin-user-actions">
-          <input class="input admin-reset-input" type="password" placeholder="새 비밀번호" data-uid="${user.uid}">
-          <button class="btn btn-line admin-reset-btn" type="button" data-uid="${user.uid}">초기화</button>
-        </div>` : `<div class="muted" style="font-size:11px;font-weight:600">전화번호 전용 계정 (비밀번호 초기화 불가)</div>`}
-      `;
-      box.appendChild(row);
-    });
-    box.querySelectorAll(".admin-reset-btn").forEach((btn) => {
-      btn.addEventListener("click", async () => {
-        const uid = btn.dataset.uid;
-        const input = box.querySelector(`.admin-reset-input[data-uid="${uid}"]`);
-        const newPassword = input?.value?.trim();
-        if (!newPassword || newPassword.length < 6) return showToast("6자 이상 비밀번호를 입력해주세요.");
-        try {
-          await adminApi("/api/admin/reset-password", { uid, newPassword });
-          if (input) input.value = "";
-          showToast("비밀번호를 초기화했어요.");
-        } catch (error) {
-          showToast(error.message || "비밀번호 초기화에 실패했어요.");
+      </div>
+      <div class="admin-user-tools">
+        ${
+          user.email
+            ? `<input class="input admin-reset-input" type="password" placeholder="새 비밀번호 (6자+)" data-uid="${user.uid}">
+        <button type="button" class="admin-tool-btn" data-action="reset-pw" data-uid="${user.uid}"><i class="fa-solid fa-key"></i> 비번 초기화</button>
+        <button type="button" class="admin-tool-btn" data-action="reset-link" data-email="${user.email}"><i class="fa-solid fa-link"></i> 재설정 링크</button>`
+            : ""
         }
-      });
-    });
+        <button type="button" class="admin-tool-btn" data-action="toggle" data-uid="${user.uid}" data-disabled="${user.disabled}">
+          <i class="fa-solid fa-${user.disabled ? "check" : "ban"}"></i> ${user.disabled ? "정지 해제" : "계정 정지"}
+        </button>
+        <button type="button" class="admin-tool-btn danger" data-action="delete" data-uid="${user.uid}" data-label="${label}">
+          <i class="fa-solid fa-trash"></i> 삭제
+        </button>
+      </div>`;
+    box.appendChild(row);
+  });
+  box.querySelectorAll("[data-action]").forEach((btn) => {
+    btn.addEventListener("click", () => handleAdminUserAction(btn));
+  });
+}
+async function handleAdminUserAction(btn) {
+  const action = btn.dataset.action;
+  const uid = btn.dataset.uid;
+  try {
+    if (action === "reset-pw") {
+      const input = document.querySelector(`.admin-reset-input[data-uid="${uid}"]`);
+      const newPassword = input?.value?.trim();
+      if (!newPassword || newPassword.length < 6) return showToast("6자 이상 비밀번호를 입력해주세요.");
+      await adminApi("/api/admin/reset-password", { uid, newPassword });
+      if (input) input.value = "";
+      showToast("비밀번호를 초기화했어요.");
+    } else if (action === "reset-link") {
+      const data = await adminApi("/api/admin/reset-link", { email: btn.dataset.email });
+      try {
+        await navigator.clipboard.writeText(data.link);
+        showToast("재설정 링크를 복사했어요. 카톡/메일로 전달하세요.");
+      } catch (_e) {
+        window.prompt("재설정 링크 (복사해서 전달하세요):", data.link);
+      }
+    } else if (action === "toggle") {
+      const disabled = btn.dataset.disabled === "true";
+      await adminApi("/api/admin/toggle-user", { uid, disabled: !disabled });
+      showToast(disabled ? "계정 정지를 해제했어요." : "계정을 정지했어요.");
+      await renderAdminUsers();
+    } else if (action === "delete") {
+      if (!confirm(`"${btn.dataset.label}" 계정을 삭제할까요? 되돌릴 수 없습니다.`)) return;
+      await adminApi("/api/admin/delete-user", { uid });
+      showToast("계정을 삭제했어요.");
+      await loadAdminDashboard();
+    }
   } catch (error) {
-    box.innerHTML = `<div class="muted" style="padding:16px;font-weight:700">${error.message || "목록 로드 실패"}</div>`;
+    showToast(error.message || "작업에 실패했어요.");
   }
+}
+function bindAdminControls() {
+  document.getElementById("admin-search")?.addEventListener("input", paintAdminUserList);
+  document.getElementById("admin-filter")?.addEventListener("change", paintAdminUserList);
 }
 async function saveAdminCredentials() {
   if (!state.admin?.token) return showToast("관리자 로그인이 필요해요.");
@@ -759,13 +725,11 @@ window.loginWithGoogle = loginWithGoogle;
 window.registerFromSignup = registerFromSignup;
 window.sendPasswordReset = sendPasswordReset;
 window.showFindHint = showFindHint;
-window.sendLoginPhoneOtp = sendLoginPhoneOtp;
-window.verifyLoginPhoneOtp = verifyLoginPhoneOtp;
-window.sendSignupPhoneOtp = sendSignupPhoneOtp;
-window.verifySignupPhoneOtp = verifySignupPhoneOtp;
 window.adminLogout = adminLogout;
 window.saveAdminCredentials = saveAdminCredentials;
 window.renderAdminUsers = renderAdminUsers;
+window.loadAdminDashboard = loadAdminDashboard;
+window.exportAdminUsersCsv = exportAdminUsersCsv;
 window.changePassword = changePassword; window.exportDiaries = exportDiaries; window.showToast = showToast; window.openSheet = openSheet; window.closeSheet = closeSheet;
 
 function bindFindAccountTabs() {
@@ -791,9 +755,7 @@ function bindFindAccountTabs() {
 
 (async function bootstrap() {
   applyTheme(localStorage.getItem("handam-theme") || "light");
-  bindMoodPicker("#emo-pick"); bindMoodPicker("#manual-mood"); bindSegmentButtons(); bindFindAccountTabs(); bindAuthModeTabs();
-  setAuthMode("email", "login");
-  setAuthMode("email", "signup");
+  bindMoodPicker("#emo-pick"); bindMoodPicker("#manual-mood"); bindSegmentButtons(); bindFindAccountTabs(); bindAdminControls();
   fillBirthdaySelects();
   document.getElementById("ocr-camera-file").addEventListener("change", (e) => runOCRFile(e.target.files?.[0]));
   document.getElementById("ocr-gallery-file").addEventListener("change", (e) => runOCRFile(e.target.files?.[0]));

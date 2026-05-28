@@ -213,9 +213,13 @@ async function getAdminStats() {
   for (const user of users) {
     if (isActiveFromAuthUser(user, presence[user.uid], now)) activeCount += 1;
   }
+  const disabledUsers = users.filter((u) => u.disabled).length;
+  const emailUsers = users.filter((u) => u.email).length;
   return {
     totalUsers: users.length,
     activeUsers: activeCount,
+    disabledUsers,
+    emailUsers,
     activeWindowMinutes: ACTIVE_WINDOW_MS / 60000,
     firebaseConfigured: hasFirebaseAdmin(),
     firestoreEnabled,
@@ -255,6 +259,33 @@ async function resetUserPassword(uid, newPassword) {
   return { ok: true, uid };
 }
 
+async function setUserDisabled(uid, disabled) {
+  if (!hasFirebaseAdmin()) throw new Error("FIREBASE_SERVICE_ACCOUNT가 설정되지 않았습니다.");
+  if (!uid) throw new Error("uid가 필요합니다.");
+  await getAuth().updateUser(uid, { disabled });
+  return { ok: true, uid, disabled };
+}
+
+async function deleteUser(uid) {
+  if (!hasFirebaseAdmin()) throw new Error("FIREBASE_SERVICE_ACCOUNT가 설정되지 않았습니다.");
+  if (!uid) throw new Error("uid가 필요합니다.");
+  await getAuth().deleteUser(uid);
+  return { ok: true, uid };
+}
+
+function getPublicAppUrl() {
+  if (process.env.APP_PUBLIC_URL) return String(process.env.APP_PUBLIC_URL).replace(/\/$/, "");
+  if (process.env.VERCEL_URL) return `https://${process.env.VERCEL_URL}`;
+  return "https://handam-981b6.firebaseapp.com";
+}
+
+async function createPasswordResetLink(email) {
+  if (!hasFirebaseAdmin()) throw new Error("FIREBASE_SERVICE_ACCOUNT가 설정되지 않았습니다.");
+  if (!email) throw new Error("email이 필요합니다.");
+  const link = await getAuth().generatePasswordResetLink(email, { url: getPublicAppUrl() });
+  return { ok: true, email, link };
+}
+
 module.exports = {
   verifyAdminToken,
   adminLogin,
@@ -262,6 +293,9 @@ module.exports = {
   getAdminStats,
   getAdminUsers,
   resetUserPassword,
+  setUserDisabled,
+  deleteUser,
+  createPasswordResetLink,
   touchPresence,
   hasFirebaseAdmin,
   loadAdminConfig,
