@@ -583,7 +583,16 @@ async function loadAdminDashboard() {
     document.getElementById("admin-active-window").textContent = String(stats.activeWindowMinutes ?? 15);
     const hint = document.getElementById("admin-firebase-hint");
     if (hint) {
-      hint.style.display = stats.firebaseConfigured ? "none" : "block";
+      if (!stats.firebaseConfigured) {
+        hint.textContent = "FIREBASE_SERVICE_ACCOUNT 환경 변수를 설정하면 유저 목록·비밀번호 초기화가 활성화됩니다.";
+        hint.style.display = "block";
+      } else if (stats.firestoreEnabled === false) {
+        hint.textContent =
+          "Firestore가 아직 활성화되지 않았어요. 유저 목록은 표시되지만, 실시간 활동 추적은 최근 로그인 시간 기준으로 표시됩니다. Firebase Console에서 Firestore를 켜면 더 정확해져요.";
+        hint.style.display = "block";
+      } else {
+        hint.style.display = "none";
+      }
     }
     await renderAdminUsers();
   } catch (error) {

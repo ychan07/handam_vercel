@@ -80,12 +80,24 @@ function isValidConfig(config) {
   return Boolean(config?.username && config?.salt && config?.passwordHash && config.passwordHash !== "placeholder");
 }
 
+function isFirestoreUnavailable(error) {
+  const msg = String(error?.message || error || "");
+  return (
+    msg.includes("PERMISSION_DENIED") ||
+    msg.includes("Firestore API has not been used") ||
+    msg.includes("firestore.googleapis.com") ||
+    error?.code === 7
+  );
+}
+
 async function loadAdminConfig() {
   if (hasFirebaseAdmin()) {
     try {
       const snap = await getFirestore().doc(ADMIN_DOC).get();
       if (snap.exists && isValidConfig(snap.data())) return snap.data();
-    } catch (_error) {}
+    } catch (error) {
+      if (!isFirestoreUnavailable(error)) throw error;
+    }
   }
   const local = readLocalConfig();
   if (isValidConfig(local)) return local;
@@ -97,7 +109,11 @@ async function loadAdminConfig() {
 async function saveAdminConfig(config) {
   const next = { ...config, updatedAt: new Date().toISOString() };
   if (hasFirebaseAdmin()) {
-    await getFirestore().doc(ADMIN_DOC).set(next, { merge: true });
+    try {
+      await getFirestore().doc(ADMIN_DOC).set(next, { merge: true });
+    } catch (error) {
+      if (!isFirestoreUnavailable(error)) throw error;
+    }
   }
   writeLocalConfig(next);
   return next;
@@ -146,63 +162,84 @@ async function listFirebaseUsers() {
 }
 
 async function getPresenceMap() {
-  if (!hasFirebaseAdmin()) return {};
-  const snap = await getFirestore().collection(PRESENCE_COLLECTION).get();
-  const map = {};
-  snap.forEach((doc) => {
-    map[doc.id] = doc.data();
-  });
-  return map;
+  if (!hasFirebaseAdmin()) return { map: {}, firestoreEnabled: false };
+  try {
+    const snap = await getFirestore().collection(PRESENCE_COLLECTION).get();
+    const map = {};
+    snap.forEach((doc) => {
+      map[doc.id] = doc.data();
+    });
+    return { map, firestoreEnabled: true };
+  } catch (error) {
+    if (isFirestoreUnavailable(error)) return { map: {}, firestoreEnabled: false };
+    throw error;
+  }
+}
+
+function isActiveByTimestamp(isoTime, now = Date.now()) {
+  if (!isoTime) return false;
+  return now - new Date(isoTime).getTime() <= ACTIVE_WINDOW_MS;
+}
+
+function isActiveFromAuthUser(user, presenceEntry, now = Date.now()) {
+  if (presenceEntry?.lastSeen && isActiveByTimestamp(presenceEntry.lastSeen, now)) return true;
+  return isActiveByTimestamp(user.metadata?.lastSignInTime, now);
 }
 
 async function touchPresence(uid, payload = {}) {
   if (!hasFirebaseAdmin() || !uid) return;
-  await getFirestore()
-    .collection(PRESENCE_COLLECTION)
-    .doc(uid)
-    .set(
-      {
-        uid,
-        lastSeen: new Date().toISOString(),
-        ...payload,
-      },
-      { merge: true }
-    );
+  try {
+    await getFirestore()
+      .collection(PRESENCE_COLLECTION)
+      .doc(uid)
+      .set(
+        {
+          uid,
+          lastSeen: new Date().toISOString(),
+          ...payload,
+        },
+        { merge: true }
+      );
+  } catch (error) {
+    if (!isFirestoreUnavailable(error)) throw error;
+  }
 }
 
 async function getAdminStats() {
   const users = await listFirebaseUsers();
-  const presence = await getPresenceMap();
+  const { map: presence, firestoreEnabled } = await getPresenceMap();
   const now = Date.now();
   let activeCount = 0;
   for (const user of users) {
-    const seen = presence[user.uid]?.lastSeen;
-    if (seen && now - new Date(seen).getTime() <= ACTIVE_WINDOW_MS) activeCount += 1;
+    if (isActiveFromAuthUser(user, presence[user.uid], now)) activeCount += 1;
   }
   return {
     totalUsers: users.length,
     activeUsers: activeCount,
     activeWindowMinutes: ACTIVE_WINDOW_MS / 60000,
     firebaseConfigured: hasFirebaseAdmin(),
+    firestoreEnabled,
+    activeSource: firestoreEnabled ? "presence" : "lastSignIn",
   };
 }
 
 async function getAdminUsers() {
   const users = await listFirebaseUsers();
-  const presence = await getPresenceMap();
+  const { map: presence, firestoreEnabled } = await getPresenceMap();
   const now = Date.now();
   return users.map((user) => {
-    const seen = presence[user.uid]?.lastSeen;
-    const active = seen && now - new Date(seen).getTime() <= ACTIVE_WINDOW_MS;
+    const entry = presence[user.uid];
+    const seen = entry?.lastSeen || user.metadata?.lastSignInTime || null;
+    const active = isActiveFromAuthUser(user, entry, now);
     return {
       uid: user.uid,
       email: user.email || null,
-      phone: user.phoneNumber || presence[user.uid]?.phone || null,
-      displayName: user.displayName || presence[user.uid]?.displayName || null,
+      phone: user.phoneNumber || entry?.phone || null,
+      displayName: user.displayName || entry?.displayName || null,
       disabled: user.disabled,
       createdAt: user.metadata.creationTime,
       lastSignIn: user.metadata.lastSignInTime,
-      lastSeen: seen || null,
+      lastSeen: seen,
       active,
       providers: (user.providerData || []).map((p) => p.providerId),
     };
