@@ -536,6 +536,10 @@
       <div id="login-panel-phone" class="card reveal" style="--d:.07s;margin-top:12px;display:none">
         <label class="field-label">전화번호</label>
         <input class="input" id="login-phone" type="tel" placeholder="01012345678" autocomplete="tel">
+        <p class="muted" style="font-size:11px;font-weight:600;margin-top:12px;line-height:1.5">
+          아래 <b>로봇이 아닙니다</b> 확인 후 인증번호를 받아주세요.
+        </p>
+        <div class="recaptcha-wrap" id="recaptcha-login"></div>
         <button class="btn btn-primary" style="margin-top:16px" onclick="sendLoginPhoneOtp()">
           <i class="fa-solid fa-mobile-screen"></i> 인증번호 받기
         </button>
@@ -547,7 +551,6 @@
           <i class="fa-solid fa-circle-check"></i> 인증 완료
         </button>
       </div>
-      <div id="recaptcha-login"></div>
       <button class="btn btn-line reveal" style="--d:.14s;margin-top:10px" onclick="loginWithGoogle()">
         <i class="fa-brands fa-google"></i> Google로 로그인
       </button>
@@ -593,6 +596,10 @@
         <input class="input" id="signup-name-phone" type="text" placeholder="예: 한담" oninput="document.getElementById('signup-name').value=this.value">
         <label class="field-label" style="margin-top:14px">전화번호</label>
         <input class="input" id="signup-phone-auth" type="tel" placeholder="01012345678" autocomplete="tel">
+        <p class="muted" style="font-size:11px;font-weight:600;margin-top:12px;line-height:1.5">
+          아래 <b>로봇이 아닙니다</b> 확인 후 인증번호를 받아주세요.
+        </p>
+        <div class="recaptcha-wrap" id="recaptcha-signup"></div>
         <button class="btn btn-primary" style="margin-top:16px" onclick="sendSignupPhoneOtp()">
           <i class="fa-solid fa-mobile-screen"></i> 인증번호 받기
         </button>
@@ -604,7 +611,6 @@
           <i class="fa-solid fa-circle-check"></i> 가입 완료
         </button>
       </div>
-      <div id="recaptcha-signup"></div>
       <div class="auth-links reveal" style="--d:.14s">
         <button type="button" class="text-link" onclick="go('login')">이미 계정이 있어요</button>
       </div>

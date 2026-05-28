@@ -29,6 +29,7 @@ const firebaseConfig = {
 
 const firebaseApp = initializeApp(firebaseConfig);
 const auth = getAuth(firebaseApp);
+auth.languageCode = "ko";
 analyticsSupported()
   .then((supported) => {
     if (supported) getAnalytics(firebaseApp);
@@ -130,17 +131,29 @@ function resetRecaptcha(instance) {
   try { instance.clear(); } catch (_e) {}
   return null;
 }
-function ensureRecaptcha(containerId, refKey) {
+async function ensureRecaptcha(containerId, refKey) {
   const el = document.getElementById(containerId);
   if (!el) throw new Error("reCAPTCHA 컨테이너를 찾을 수 없습니다.");
-  if (refKey === "login") {
-    recaptchaLogin = resetRecaptcha(recaptchaLogin);
-    recaptchaLogin = new RecaptchaVerifier(auth, el, { size: "invisible" });
-    return recaptchaLogin;
+  el.innerHTML = "";
+  if (refKey === "login") recaptchaLogin = resetRecaptcha(recaptchaLogin);
+  else recaptchaSignup = resetRecaptcha(recaptchaSignup);
+  const verifier = new RecaptchaVerifier(auth, el, {
+    size: "normal",
+    callback: () => {},
+    "expired-callback": () => showToast("reCAPTCHA가 만료되었어요. 다시 시도해주세요."),
+  });
+  await verifier.render();
+  if (refKey === "login") recaptchaLogin = verifier;
+  else recaptchaSignup = verifier;
+  return verifier;
+}
+async function preparePhoneRecaptcha(prefix) {
+  const containerId = prefix === "login" ? "recaptcha-login" : "recaptcha-signup";
+  try {
+    await ensureRecaptcha(containerId, prefix);
+  } catch (error) {
+    console.warn("reCAPTCHA 준비 실패:", error);
   }
-  recaptchaSignup = resetRecaptcha(recaptchaSignup);
-  recaptchaSignup = new RecaptchaVerifier(auth, el, { size: "invisible" });
-  return recaptchaSignup;
 }
 function setAuthMode(mode, prefix) {
   const emailPanel = document.getElementById(`${prefix}-panel-email`);
@@ -249,22 +262,36 @@ async function setAuthFromUser(user) {
   updateUserUI();
   startPresenceHeartbeat();
 }
-function authErrorMessage(error) {
+function authErrorMessage(error, context = {}) {
   const code = error?.code || "";
+  const message = error?.message || "";
   if (code === "auth/configuration-not-found" || code === "auth/auth-domain-config-required") {
-    return "Firebase 인증 설정이 비어 있어요. Email/Password 또는 소셜 로그인 제공자를 콘솔에서 먼저 활성화해주세요.";
+    return "Firebase 인증 설정이 비어 있어요. Authentication에서 로그인 제공자를 활성화해주세요.";
   }
   if (code === "auth/invalid-credential" || code === "auth/wrong-password" || code === "auth/user-not-found") {
     return "이메일 또는 비밀번호를 확인해주세요.";
   }
   if (code === "auth/popup-closed-by-user") return "로그인 창이 닫혔어요. 다시 시도해주세요.";
-  if (code === "auth/operation-not-allowed") return "해당 로그인 방식이 비활성화되어 있어요. Firebase Console에서 활성화해주세요.";
+  if (code === "auth/operation-not-allowed") {
+    if (context.provider === "phone") {
+      return "전화 로그인이 막혀 있어요. Firebase Console > Authentication > 로그인 방법 > 전화 '사용 설정' 확인, 그리고 Blaze(종량제) 요금제 업그레이드가 필요할 수 있어요.";
+    }
+    return "해당 로그인 방식이 비활성화되어 있어요. Firebase Console에서 활성화해주세요.";
+  }
+  if (code === "auth/invalid-app-credential" || message.includes("INVALID_APP_CREDENTIAL")) {
+    return "앱 인증(reCAPTCHA) 오류예요. Authentication > 설정 > 승인된 도메인에 localhost와 배포 도메인을 추가한 뒤, reCAPTCHA 체크박스를 먼저 눌러주세요.";
+  }
   if (code === "auth/invalid-phone-number") return "전화번호 형식을 확인해주세요. (예: 01012345678)";
   if (code === "auth/too-many-requests") return "요청이 너무 많아요. 잠시 후 다시 시도해주세요.";
   if (code === "auth/invalid-verification-code") return "인증번호가 올바르지 않아요.";
   if (code === "auth/code-expired") return "인증번호가 만료되었어요. 다시 요청해주세요.";
-  if (code === "auth/captcha-check-failed") return "reCAPTCHA 인증에 실패했어요. 새로고침 후 다시 시도해주세요.";
-  return error?.message || "인증 처리에 실패했어요.";
+  if (code === "auth/captcha-check-failed" || code === "auth/missing-app-credential") {
+    return "reCAPTCHA 확인이 필요해요. '로봇이 아닙니다' 체크 후 다시 인증번호 받기를 눌러주세요.";
+  }
+  if (message.includes("BILLING_NOT_ENABLED") || message.includes("billing")) {
+    return "전화 인증은 Firebase Blaze(종량제) 요금제가 필요해요. Console > 사용량 및 결제에서 업그레이드해주세요.";
+  }
+  return message || "인증 처리에 실패했어요.";
 }
 function bindAuthModeTabs() {
   document.querySelectorAll("[data-auth-mode]").forEach((btn) => {
@@ -273,6 +300,7 @@ function bindAuthModeTabs() {
       const mode = btn.dataset.mode;
       state.phoneConfirmation = null;
       setAuthMode(mode, prefix);
+      if (mode === "phone") preparePhoneRecaptcha(prefix);
     });
   });
 }
@@ -428,12 +456,13 @@ async function sendLoginPhoneOtp() {
   const phone = normalizePhoneKR(document.getElementById("login-phone").value.trim());
   if (!phone) return showToast("전화번호를 입력해주세요.");
   try {
-    const verifier = ensureRecaptcha("recaptcha-login", "login");
+    const verifier = await ensureRecaptcha("recaptcha-login", "login");
     state.phoneConfirmation = await signInWithPhoneNumber(auth, phone, verifier);
     setAuthMode("phone", "login");
     showToast("인증번호를 발송했어요.");
   } catch (error) {
-    showToast(authErrorMessage(error));
+    console.error("전화 로그인 오류:", error?.code, error?.message);
+    showToast(authErrorMessage(error, { provider: "phone" }));
   }
 }
 async function verifyLoginPhoneOtp() {
@@ -460,7 +489,7 @@ async function sendSignupPhoneOtp() {
   if (!displayName) return showToast("이름을 입력해주세요.");
   if (!phone) return showToast("전화번호를 입력해주세요.");
   try {
-    const verifier = ensureRecaptcha("recaptcha-signup", "signup");
+    const verifier = await ensureRecaptcha("recaptcha-signup", "signup");
     state.phoneConfirmation = await signInWithPhoneNumber(auth, phone, verifier);
     sessionStorage.setItem("handam-pending-name", displayName);
     setAuthMode("phone", "signup");
@@ -470,7 +499,8 @@ async function sendSignupPhoneOtp() {
     if (phonePanel) phonePanel.style.display = "none";
     showToast("인증번호를 발송했어요.");
   } catch (error) {
-    showToast(authErrorMessage(error));
+    console.error("전화 가입 오류:", error?.code, error?.message);
+    showToast(authErrorMessage(error, { provider: "phone" }));
   }
 }
 async function verifySignupPhoneOtp() {

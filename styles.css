@@ -94,7 +94,11 @@ body{
   background:var(--accent-soft);font-size:13px;font-weight:700;
   line-height:1.55;color:var(--text-soft);
 }
-#recaptcha-login,#recaptcha-signup{min-height:1px}
+.recaptcha-wrap{
+  min-height:78px;margin-top:8px;display:flex;justify-content:center;
+  overflow:hidden;border-radius:12px;background:var(--surface-2);
+  border:1px solid var(--border);padding:8px 4px;
+}
 .admin-stat-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 .admin-stat{padding:16px;text-align:center}
 .admin-stat-num{font-size:30px;font-weight:800;margin-top:8px;color:var(--accent)}
