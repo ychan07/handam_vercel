@@ -1,0 +1,9 @@
+﻿{
+  "name": "한담 (Handam)",
+  "short_name": "한담",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#F4F1EA",
+  "theme_color": "#BA6A40",
+  "lang": "ko"
+}

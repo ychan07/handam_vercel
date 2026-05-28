@@ -1,0 +1,581 @@
+﻿<!DOCTYPE html>
+<html lang="ko" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="theme-color" content="#F4F1EA">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="한담">
+<link rel="manifest" href="./manifest.webmanifest">
+<title>한담 (Handam)</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Nanum+Myeongjo:wght@400;700;800&display=swap">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+<div class="device">
+
+  <!-- ============ HOME ============ -->
+  <div id="page-home" class="page active">
+    <div class="pad">
+      <div class="topbar reveal" style="--d:.02s">
+        <div>
+          <div class="brand">
+            <div class="brand-mark"><i class="fa-solid fa-feather-pointed"></i></div>
+            <span class="brand-name">HANDAM · 한담</span>
+          </div>
+          <div class="muted" style="font-size:13px;font-weight:700">5월 18일 일요일</div>
+          <h1 class="h-page" style="margin-top:3px">좋은 아침이에요,<br>한담님 ☀️</h1>
+        </div>
+        <button class="iconbtn" onclick="toggleTheme()" id="theme-btn"><i class="fa-solid fa-moon"></i></button>
+      </div>
+
+      <!-- Weekly mood strip -->
+      <div class="card reveal" style="--d:.07s;padding:18px">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <span class="h-sec">이번 주 마음 일기</span>
+          <span class="muted" style="font-size:12px;font-weight:700">5일 기록 · 7일 연속 🔥</span>
+        </div>
+        <div class="weekstrip">
+          <div class="day"><span class="lbl">월</span><div class="dot">😊</div></div>
+          <div class="day"><span class="lbl">화</span><div class="dot">😌</div></div>
+          <div class="day"><span class="lbl">수</span><div class="dot">😐</div></div>
+          <div class="day"><span class="lbl">목</span><div class="dot">😊</div></div>
+          <div class="day"><span class="lbl">금</span><div class="dot">😌</div></div>
+          <div class="day"><span class="lbl">토</span><div class="dot" style="opacity:.4"></div></div>
+          <div class="day today"><span class="lbl">일</span><div class="dot">＋</div></div>
+        </div>
+      </div>
+
+      <!-- Fortune hero -->
+      <div class="card fortune-hero tap reveal" style="--d:.12s;margin-top:14px" onclick="go('fortune')">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <span class="eyebrow">오늘의 운세</span>
+          <span class="score-pill"><i class="fa-solid fa-star"></i> 95점</span>
+        </div>
+        <p class="serif" style="font-size:19px;font-weight:700;line-height:1.6;margin-top:12px">
+          “말하는 대로 이루어지는<br>마법 같은 하루입니다.”
+        </p>
+        <div style="display:flex;align-items:center;gap:8px;margin-top:16px;font-size:13px;font-weight:700">
+          <span class="swatch" style="background:#7FB7D9"></span>
+          행운의 색 · 스카이 블루
+          <i class="fa-solid fa-chevron-right" style="margin-left:auto;font-size:12px;opacity:.8"></i>
+        </div>
+      </div>
+
+      <!-- AI prompt -->
+      <div class="card tap reveal" style="--d:.17s;margin-top:14px;background:var(--accent-soft);border-color:transparent"
+           onclick="go('prompts')">
+        <span class="eyebrow"><i class="fa-solid fa-wand-magic-sparkles"></i> AI 글감 추천</span>
+        <p style="font-size:15px;font-weight:800;line-height:1.55;margin-top:9px;color:var(--text)">
+          지난 주말의 설렘, 아직 글로 남기지 않으셨네요.
+        </p>
+        <div style="display:flex;align-items:center;gap:6px;margin-top:12px;
+                    font-size:13px;font-weight:800;color:var(--accent)">
+          오늘의 글감 보러가기 <i class="fa-solid fa-arrow-right"></i>
+        </div>
+      </div>
+
+      <!-- Recent records -->
+      <div class="reveal" style="--d:.22s;display:flex;justify-content:space-between;align-items:center;margin:26px 4px 12px">
+        <span class="h-sec">최근 기록</span>
+        <button class="text-link" onclick="go('records')">전체보기</button>
+      </div>
+      <div class="card reveal" style="--d:.25s;padding:6px" id="home-record-list"></div>
+    </div>
+  </div>
+
+  <!-- ============ FORTUNE ============ -->
+  <div id="page-fortune" class="page">
+    <div class="pad" style="padding-bottom:132px">
+      <div class="backbar reveal" style="--d:.02s">
+        <button class="iconbtn" onclick="go('home')"><i class="fa-solid fa-arrow-left"></i></button>
+        <h1 class="h-page">오늘의 운세</h1>
+      </div>
+
+      <!-- Gauge -->
+      <div class="card fortune-hero reveal" style="--d:.06s;padding:0">
+        <div class="gauge-wrap">
+          <div class="gauge">
+            <svg width="188" height="188" viewBox="0 0 188 188">
+              <circle class="ring-bg" cx="94" cy="94" r="82" fill="none" stroke-width="13"/>
+              <circle id="gauge-ring" class="ring-fg" cx="94" cy="94" r="82" fill="none" stroke-width="13"
+                      stroke-dasharray="515.2" stroke-dashoffset="515.2"/>
+            </svg>
+            <div class="gauge-center">
+              <span class="gauge-num" id="gauge-num">0</span>
+              <span style="font-size:12px;font-weight:800;letter-spacing:.05em;opacity:.85">총운 · 매우 좋음</span>
+            </div>
+          </div>
+          <p class="serif" style="text-align:center;font-size:15px;line-height:1.75;margin-top:6px;opacity:.95">
+            평소 미뤄왔던 고백이나 제안이 있다면,<br>망설임 없이 오늘 꺼내 보세요.
+          </p>
+        </div>
+      </div>
+
+      <!-- Lucky -->
+      <div class="lucky-grid reveal" style="--d:.11s;margin-top:14px">
+        <div class="card" style="padding:18px">
+          <div class="muted" style="font-size:12px;font-weight:800;margin-bottom:8px">행운의 색</div>
+          <div style="display:flex;align-items:center;gap:9px">
+            <span class="swatch" style="background:#7FB7D9;border-color:var(--border)"></span>
+            <span style="font-size:15px;font-weight:800">스카이 블루</span>
+          </div>
+        </div>
+        <div class="card" style="padding:18px">
+          <div class="muted" style="font-size:12px;font-weight:800;margin-bottom:8px">행운의 숫자</div>
+          <div style="font-size:15px;font-weight:800">7 · 24</div>
+        </div>
+      </div>
+
+      <!-- Category advice -->
+      <div class="reveal" style="--d:.16s;margin:24px 4px 12px"><span class="h-sec">분야별 조언</span></div>
+      <div class="card reveal" style="--d:.19s;padding:6px 20px">
+        <div class="advice-row">
+          <div class="advice-ic" style="background:#FADFD9;color:#BC5743"><i class="fa-solid fa-heart"></i></div>
+          <div style="flex:1">
+            <div style="font-size:14px;font-weight:800">연애운 <span class="muted" style="font-weight:700">· 92</span></div>
+            <div class="muted" style="font-size:12px;font-weight:600">대화가 물 흐르듯 자연스럽게 풀립니다.</div>
+            <div class="bar"><i style="width:92%"></i></div>
+          </div>
+        </div>
+        <div class="advice-row">
+          <div class="advice-ic" style="background:#FBEAD0;color:#B17A22"><i class="fa-solid fa-coins"></i></div>
+          <div style="flex:1">
+            <div style="font-size:14px;font-weight:800">금전운 <span class="muted" style="font-weight:700">· 78</span></div>
+            <div class="muted" style="font-size:12px;font-weight:600">작은 횡재수, 주변을 잘 살펴보세요.</div>
+            <div class="bar"><i style="width:78%"></i></div>
+          </div>
+        </div>
+        <div class="advice-row">
+          <div class="advice-ic" style="background:#E2EBE0;color:#5C7A56"><i class="fa-solid fa-briefcase"></i></div>
+          <div style="flex:1">
+            <div style="font-size:14px;font-weight:800">성공운 <span class="muted" style="font-weight:700">· 96</span></div>
+            <div class="muted" style="font-size:12px;font-weight:600">집중력이 최고조, 능률이 크게 오릅니다.</div>
+            <div class="bar"><i style="width:96%"></i></div>
+          </div>
+        </div>
+      </div>
+
+      <button class="btn btn-line reveal" style="--d:.24s;margin-top:16px" onclick="openSheet()">
+        <i class="fa-solid fa-cake-candles"></i> 생일 정보로 더 정확하게 보기
+      </button>
+      <p class="muted reveal" style="--d:.27s;font-size:11px;text-align:center;margin-top:10px;font-weight:600">
+        un7.kr 운세 API 연동 · 매일 0시 갱신
+      </p>
+    </div>
+  </div>
+
+  <!-- ============ RECORD / OCR ============ -->
+  <div id="page-diary" class="page">
+    <div class="pad">
+      <div class="reveal" style="--d:.02s;padding:16px 0 6px">
+        <span class="eyebrow">5월 18일 · 일요일</span>
+        <h1 class="h-page" style="margin-top:5px">오늘을 기록해요</h1>
+      </div>
+
+      <!-- Step 1: upload -->
+      <div id="ocr-upload">
+        <div class="dropzone reveal" style="--d:.07s;margin-top:14px">
+          <div class="cam-badge"><i class="fa-solid fa-camera"></i></div>
+          <div style="font-size:15px;font-weight:800">손글씨 일기를 찍어주세요</div>
+          <div class="muted" style="font-size:12px;font-weight:600;margin-top:5px">
+            AI가 글씨를 인식하고 깔끔하게 정리해드려요
+          </div>
+          <input id="ocr-camera-file" class="input" type="file" accept="image/*" capture="environment" style="display:none">
+          <input id="ocr-gallery-file" class="input" type="file" accept="image/*" style="display:none">
+        </div>
+        <div class="reveal" style="--d:.12s;display:flex;gap:10px;margin-top:12px">
+          <button class="btn btn-primary" onclick="openCameraOCR()"><i class="fa-solid fa-camera"></i> 촬영하기</button>
+          <button class="btn btn-ghost" onclick="openGalleryOCR()"><i class="fa-solid fa-image"></i> 보관함</button>
+        </div>
+        <div class="card tap reveal" style="--d:.17s;margin-top:14px;display:flex;gap:13px;align-items:center;padding:16px" onclick="go('manual')">
+          <div class="diary-thumb" style="background:var(--accent-soft);color:var(--accent)">
+            <i class="fa-solid fa-keyboard"></i>
+          </div>
+          <div style="flex:1">
+            <div style="font-size:14px;font-weight:800">직접 입력하기</div>
+            <div class="muted" style="font-size:12px;font-weight:600">사진 없이 바로 타이핑할게요</div>
+          </div>
+          <i class="fa-solid fa-chevron-right muted" style="font-size:12px"></i>
+        </div>
+      </div>
+
+      <!-- Step 2: scanning -->
+      <div id="ocr-loading" style="display:none">
+        <div class="scanframe reveal" style="margin-top:14px">
+          <div class="scanline"></div>
+          <div class="ln" style="width:86%"></div>
+          <div class="ln" style="width:72%"></div>
+          <div class="ln" style="width:91%"></div>
+          <div class="ln" style="width:64%"></div>
+          <div class="ln" style="width:80%;margin-bottom:0"></div>
+        </div>
+        <div style="display:flex;align-items:center;gap:11px;margin-top:18px;justify-content:center">
+          <div class="spinner"></div>
+          <span style="font-size:13px;font-weight:800;color:var(--accent)" id="ocr-status">손글씨를 인식하고 있어요…</span>
+        </div>
+      </div>
+
+      <!-- Step 3: result -->
+      <div id="ocr-result" style="display:none">
+        <div class="reveal" style="margin-top:16px">
+          <span class="eyebrow"><i class="fa-solid fa-circle-check"></i> 인식 완료</span>
+        </div>
+        <div class="card reveal" style="--d:.05s;margin-top:10px">
+          <div class="muted" style="font-size:12px;font-weight:800;margin-bottom:10px">원문 (Clova OCR)</div>
+          <p class="ocr-quote" id="ocr-origin"></p>
+        </div>
+        <div class="card reveal" style="--d:.1s;margin-top:12px;background:var(--accent-soft);border-color:transparent">
+          <span class="eyebrow"><i class="fa-solid fa-wand-magic-sparkles"></i> AI 한 줄 요약</span>
+          <p class="serif" id="ocr-summary" style="font-size:16px;font-weight:700;line-height:1.6;margin-top:9px;color:var(--text)"></p>
+        </div>
+        <div class="reveal" style="--d:.15s;margin:20px 4px 10px">
+          <span class="h-sec">오늘의 감정은 어땠나요?</span>
+        </div>
+        <div class="emo-pick reveal" style="--d:.18s" id="emo-pick">
+          <div class="emo-opt sel">😊 행복</div>
+          <div class="emo-opt">😌 평온</div>
+          <div class="emo-opt">🥰 설렘</div>
+          <div class="emo-opt">😐 차분</div>
+          <div class="emo-opt">😔 지침</div>
+        </div>
+        <div class="reveal" style="--d:.22s;display:flex;gap:10px;margin-top:22px">
+          <button class="btn btn-line" style="flex:0 0 40%" onclick="resetOCR()">다시 찍기</button>
+          <button class="btn btn-primary" onclick="saveDiary()"><i class="fa-solid fa-bookmark"></i> 저장하기</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ PROMPTS ============ -->
+  <div id="page-prompts" class="page">
+    <div class="pad">
+      <div class="reveal" style="--d:.02s;padding:16px 0 6px">
+        <span class="eyebrow"><i class="fa-solid fa-wand-magic-sparkles"></i> 맞춤 글감</span>
+        <h1 class="h-page" style="margin-top:5px">오늘은 무얼 써볼까요?</h1>
+      </div>
+      <div class="card reveal" style="--d:.07s;margin-top:14px;display:flex;align-items:center;gap:13px;padding:16px">
+        <div class="diary-thumb" style="background:var(--accent-soft);color:var(--accent)">
+          <i class="fa-solid fa-chart-simple"></i>
+        </div>
+        <div style="font-size:13px;font-weight:700;line-height:1.5;color:var(--text-soft)" id="prompt-meta">
+          최근 일기 <b style="color:var(--text)">0편</b>을 분석해<br>오늘의 마음에 어울리는 글감을 골랐어요.
+        </div>
+      </div>
+
+      <div class="card prompt-card tap reveal prompt-slot" style="--d:.12s;margin-top:14px" onclick="startPromptDiary(this)">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <span class="match"><i class="fa-solid fa-bolt"></i> 추천도 98%</span>
+          <span style="font-size:20px">🍜</span>
+        </div>
+        <h3 style="font-size:16px;font-weight:800;margin-top:11px">가장 행복했던 한 끼</h3>
+        <p class="soft" style="font-size:13px;font-weight:600;line-height:1.6;margin-top:6px">
+          최근 일기에 ‘음식’ 키워드가 자주 보였어요. 가장 기억에 남는 맛은 무엇이었나요?
+        </p>
+      </div>
+
+      <div class="card prompt-card tap reveal prompt-slot" style="--d:.17s;margin-top:12px" onclick="startPromptDiary(this)">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <span class="match"><i class="fa-solid fa-bolt"></i> 추천도 85%</span>
+          <span style="font-size:20px">🌱</span>
+        </div>
+        <h3 style="font-size:16px;font-weight:800;margin-top:11px">나를 성장시킨 실수</h3>
+        <p class="soft" style="font-size:13px;font-weight:600;line-height:1.6;margin-top:6px">
+          지난주 프로젝트 고민을 기록하셨죠. 그 과정에서 배운 점을 정리해 볼까요?
+        </p>
+      </div>
+
+      <div class="card prompt-card tap reveal prompt-slot" style="--d:.22s;margin-top:12px" onclick="startPromptDiary(this)">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <span class="match"><i class="fa-solid fa-bolt"></i> 추천도 72%</span>
+          <span style="font-size:20px">💌</span>
+        </div>
+        <h3 style="font-size:16px;font-weight:800;margin-top:11px">1년 뒤의 나에게</h3>
+        <p class="soft" style="font-size:13px;font-weight:600;line-height:1.6;margin-top:6px">
+          지금의 목표들을 1년 뒤의 내가 읽는다면, 어떤 마음이 들까요?
+        </p>
+      </div>
+
+      <button class="btn btn-line reveal" style="--d:.27s;margin-top:16px" onclick="refreshPrompts()">
+        <i class="fa-solid fa-rotate"></i> 다른 글감 추천받기
+      </button>
+    </div>
+  </div>
+
+  <!-- ============ SETTINGS ============ -->
+  <div id="page-settings" class="page">
+    <div class="pad">
+      <div class="reveal" style="--d:.02s;padding:16px 0 6px"><h1 class="h-page">내 정보</h1></div>
+
+      <div class="card reveal" style="--d:.06s;margin-top:14px;display:flex;align-items:center;gap:14px">
+        <div class="avatar">정</div>
+        <div style="flex:1">
+          <div style="font-size:17px;font-weight:800">정한담</div>
+          <div class="muted" style="font-size:12px;font-weight:600">jmh@example.com</div>
+        </div>
+        <span class="chip" style="background:var(--accent-soft);color:var(--accent)">한담 PRO</span>
+      </div>
+
+      <div class="reveal" style="--d:.11s;margin-top:22px">
+        <div class="group-label">화면</div>
+        <div class="list">
+          <div class="list-item">
+            <div class="lead"><i class="fa-solid fa-moon"></i> 다크 모드</div>
+            <div class="switch" id="dark-switch" onclick="toggleTheme(event)"></div>
+          </div>
+          <div class="list-item">
+            <div class="lead"><i class="fa-solid fa-bell"></i> 기록 알림</div>
+            <div class="switch on" onclick="toggleSwitch(event, this, '기록 알림 설정을 바꿨어요')"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="reveal" style="--d:.16s;margin-top:20px">
+        <div class="group-label">AI 서비스 설정</div>
+        <div class="list">
+          <div class="list-item" style="flex-direction:column;align-items:stretch;gap:11px">
+            <div style="display:flex;justify-content:space-between;align-items:center">
+              <div class="lead"><i class="fa-solid fa-gauge-high"></i> 요약 정확도</div>
+              <span class="muted" style="font-size:11px;font-weight:700">요금제에 따라 달라요</span>
+            </div>
+            <div class="seg">
+              <button>표준</button><button class="on">고급</button><button>최고</button>
+            </div>
+          </div>
+          <div class="list-item" style="flex-direction:column;align-items:stretch;gap:11px">
+            <div class="lead"><i class="fa-solid fa-comment-dots"></i> AI 페르소나</div>
+            <div class="seg">
+              <button class="on">따뜻한 공감형</button><button>담백한 정리형</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="reveal" style="--d:.21s;margin-top:20px">
+        <div class="group-label">계정 · 데이터</div>
+        <div class="list">
+          <div class="list-item tap" onclick="go('password')">
+            <div class="lead"><i class="fa-solid fa-key"></i> 비밀번호 변경</div>
+            <i class="fa-solid fa-chevron-right muted" style="font-size:12px"></i>
+          </div>
+          <div class="list-item tap" onclick="go('backup')">
+            <div class="lead"><i class="fa-solid fa-database"></i> 일기 백업 · 내보내기</div>
+            <i class="fa-solid fa-chevron-right muted" style="font-size:12px"></i>
+          </div>
+          <div class="list-item tap" onclick="logout()">
+            <div class="lead" style="color:#BC5743"><i class="fa-solid fa-right-from-bracket" style="color:#BC5743"></i> 로그아웃</div>
+          </div>
+        </div>
+      </div>
+      <p class="muted reveal" style="--d:.26s;text-align:center;font-size:11px;font-weight:600;margin-top:18px">
+        한담 v1.0.0 · 일기는 내 기기에 안전하게 보관돼요
+      </p>
+    </div>
+  </div>
+
+  <!-- ============ ALL RECORDS ============ -->
+  <div id="page-records" class="page">
+    <div class="pad">
+      <div class="backbar reveal" style="--d:.02s">
+        <button class="iconbtn" onclick="go('home')"><i class="fa-solid fa-arrow-left"></i></button>
+        <h1 class="h-page">전체 기록</h1>
+      </div>
+      <div class="card reveal" style="--d:.06s;padding:16px;display:flex;gap:10px">
+        <select class="field" id="filter-mood">
+          <option value="all">감정 전체</option>
+          <option value="행복">행복</option>
+          <option value="평온">평온</option>
+          <option value="설렘">설렘</option>
+          <option value="차분">차분</option>
+          <option value="지침">지침</option>
+        </select>
+        <select class="field" id="filter-date">
+          <option value="latest">최신순</option>
+          <option value="oldest">오래된순</option>
+        </select>
+      </div>
+      <div class="card reveal" style="--d:.09s;padding:6px" id="records-list"></div>
+    </div>
+  </div>
+
+  <!-- ============ RECORD DETAIL ============ -->
+  <div id="page-record-detail" class="page">
+    <div class="pad">
+      <div class="backbar reveal" style="--d:.02s">
+        <button class="iconbtn" onclick="go('records')"><i class="fa-solid fa-arrow-left"></i></button>
+        <h1 class="h-page">기록 상세</h1>
+      </div>
+      <div class="card reveal" style="--d:.07s">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <span class="eyebrow" id="record-date">5월 17일</span>
+          <span class="chip emo-happy" id="record-mood">행복</span>
+        </div>
+        <h2 class="serif" id="record-title" style="font-size:22px;font-weight:800;line-height:1.45;margin-top:12px">한강에서의 산책</h2>
+        <p class="soft" id="record-body" style="font-size:14px;font-weight:600;line-height:1.8;margin-top:16px">
+          친구와 함께 한강을 걸으며 바람을 느꼈다.
+        </p>
+      </div>
+      <div class="card reveal" style="--d:.12s;margin-top:14px;background:var(--accent-soft);border-color:transparent">
+        <span class="eyebrow"><i class="fa-solid fa-wand-magic-sparkles"></i> AI 요약</span>
+        <p class="serif" id="record-summary" style="font-size:16px;font-weight:700;line-height:1.65;margin-top:9px;color:var(--text)">
+          “기분 좋은 산책과 대화가 마음을 가볍게 만든 하루.”
+        </p>
+      </div>
+      <button class="btn btn-line reveal" style="--d:.17s;margin-top:12px;color:#BC5743;border-color:#F3C9C2" onclick="deleteCurrentRecord()">
+        <i class="fa-solid fa-trash"></i> 이 기록 삭제하기
+      </button>
+    </div>
+  </div>
+
+  <!-- ============ MANUAL DIARY ============ -->
+  <div id="page-manual" class="page">
+    <div class="pad">
+      <div class="backbar reveal" style="--d:.02s">
+        <button class="iconbtn" onclick="go('diary')"><i class="fa-solid fa-arrow-left"></i></button>
+        <h1 class="h-page">직접 입력</h1>
+      </div>
+      <div class="card reveal" style="--d:.07s">
+        <label class="field-label">제목</label>
+        <input class="input" id="manual-title" value="오늘의 작은 발견">
+        <label class="field-label" style="margin-top:14px">본문</label>
+        <textarea class="textarea" id="manual-body">오늘은 평소보다 천천히 걸었다. 익숙한 길에서도 새로운 간판과 나무 그림자가 눈에 들어왔다.</textarea>
+        <label class="field-label" style="margin-top:14px">감정</label>
+        <div class="emo-pick" id="manual-mood">
+          <div class="emo-opt sel">😊 행복</div>
+          <div class="emo-opt">😌 평온</div>
+          <div class="emo-opt">🥰 설렘</div>
+          <div class="emo-opt">😐 차분</div>
+        </div>
+      </div>
+      <button class="btn btn-primary reveal" style="--d:.12s;margin-top:16px" onclick="saveManualDiary()">
+        <i class="fa-solid fa-bookmark"></i> 직접 입력 저장하기
+      </button>
+    </div>
+  </div>
+
+  <!-- ============ PASSWORD ============ -->
+  <div id="page-password" class="page">
+    <div class="pad">
+      <div class="backbar reveal" style="--d:.02s">
+        <button class="iconbtn" onclick="go('settings')"><i class="fa-solid fa-arrow-left"></i></button>
+        <h1 class="h-page">비밀번호 변경</h1>
+      </div>
+      <div class="card reveal" style="--d:.07s">
+        <label class="field-label">현재 비밀번호</label>
+        <input class="input" id="password-current" type="password" placeholder="현재 비밀번호">
+        <label class="field-label" style="margin-top:14px">새 비밀번호</label>
+        <input class="input" id="password-next" type="password" placeholder="8자 이상">
+        <label class="field-label" style="margin-top:14px">새 비밀번호 확인</label>
+        <input class="input" id="password-next-confirm" type="password" placeholder="한 번 더 입력">
+      </div>
+      <button class="btn btn-primary reveal" style="--d:.12s;margin-top:16px" onclick="changePassword()">
+        <i class="fa-solid fa-key"></i> 변경하기
+      </button>
+    </div>
+  </div>
+
+  <!-- ============ BACKUP ============ -->
+  <div id="page-backup" class="page">
+    <div class="pad">
+      <div class="backbar reveal" style="--d:.02s">
+        <button class="iconbtn" onclick="go('settings')"><i class="fa-solid fa-arrow-left"></i></button>
+        <h1 class="h-page">백업 · 내보내기</h1>
+      </div>
+      <div class="card reveal" style="--d:.07s">
+        <div class="advice-row">
+          <div class="advice-ic" style="background:var(--accent-soft);color:var(--accent)"><i class="fa-solid fa-mobile-screen"></i></div>
+          <div style="flex:1">
+            <div style="font-size:14px;font-weight:800">로컬 보관</div>
+            <div class="muted" style="font-size:12px;font-weight:600">일기 14편 · 이 기기에 저장됨</div>
+          </div>
+          <span class="list-val">정상</span>
+        </div>
+        <div class="advice-row">
+          <div class="advice-ic" style="background:#E2EBE0;color:#5C7A56"><i class="fa-solid fa-file-export"></i></div>
+          <div style="flex:1">
+            <div style="font-size:14px;font-weight:800">JSON 내보내기</div>
+            <div class="muted" style="font-size:12px;font-weight:600">서버 전송 없이 파일로 저장</div>
+          </div>
+        </div>
+      </div>
+      <button class="btn btn-primary reveal" style="--d:.12s;margin-top:16px" onclick="exportDiaries()">
+        <i class="fa-solid fa-download"></i> 일기 내보내기
+      </button>
+    </div>
+  </div>
+
+  <!-- ============ LOGIN ============ -->
+  <div id="page-login" class="page">
+    <div class="pad">
+      <div class="reveal" style="--d:.02s;padding:40px 0 18px">
+        <div class="brand">
+          <div class="brand-mark"><i class="fa-solid fa-feather-pointed"></i></div>
+          <span class="brand-name">HANDAM · 한담</span>
+        </div>
+        <h1 class="h-page" style="margin-top:10px">다시 한담을<br>시작해볼까요?</h1>
+      </div>
+      <div class="card reveal" style="--d:.07s">
+        <label class="field-label">이메일</label>
+        <input class="input" id="login-email" type="email" value="" placeholder="you@example.com">
+        <label class="field-label" style="margin-top:14px">비밀번호</label>
+        <input class="input" id="login-password" type="password" value="" placeholder="비밀번호">
+      </div>
+      <button class="btn btn-primary reveal" style="--d:.12s;margin-top:16px" onclick="login()">
+        <i class="fa-solid fa-right-to-bracket"></i> 로그인
+      </button>
+      <button class="btn btn-line reveal" style="--d:.14s;margin-top:10px" onclick="register()">
+        <i class="fa-solid fa-user-plus"></i> 회원가입
+      </button>
+      <button class="btn btn-line reveal" style="--d:.16s;margin-top:10px" onclick="loginWithGoogle()">
+        <i class="fa-brands fa-google"></i> Google로 로그인
+      </button>
+    </div>
+  </div>
+
+  <!-- Bottom nav -->
+  <nav class="bottom-nav">
+    <button class="nav-item active" data-page="home" onclick="go('home')">
+      <i class="fa-solid fa-house"></i><span>홈</span>
+    </button>
+    <button class="nav-item" data-page="fortune" onclick="go('fortune')">
+      <i class="fa-solid fa-sun"></i><span>운세</span>
+    </button>
+    <button class="fab" onclick="go('diary')"><i class="fa-solid fa-feather-pointed"></i></button>
+    <button class="nav-item" data-page="prompts" onclick="go('prompts')">
+      <i class="fa-solid fa-lightbulb"></i><span>글감</span>
+    </button>
+    <button class="nav-item" data-page="settings" onclick="go('settings')">
+      <i class="fa-solid fa-user"></i><span>내 정보</span>
+    </button>
+  </nav>
+
+  <!-- Bottom sheet: birthday -->
+  <div class="scrim" id="scrim" onclick="closeSheet()"></div>
+  <div class="sheet" id="sheet">
+    <div class="grabber"></div>
+    <h2 style="font-size:18px;font-weight:800">생년월일 입력</h2>
+    <p class="muted" style="font-size:13px;font-weight:600;margin-top:6px">
+      사주 기반으로 더 정확한 운세를 알려드려요.
+    </p>
+    <div style="display:flex;gap:9px;margin-top:18px">
+      <select class="field" id="fortune-year"></select>
+      <select class="field" id="fortune-month"></select>
+      <select class="field" id="fortune-day"></select>
+    </div>
+    <div class="list-item" style="border:1px solid var(--border);border-radius:14px;margin-top:11px;padding:13px 16px">
+      <div class="lead" style="font-size:13px"><i class="fa-solid fa-moon"></i> 음력으로 입력</div>
+      <div class="switch" onclick="toggleSwitch(event, this, '음력 입력 설정을 바꿨어요')"></div>
+    </div>
+    <button class="btn btn-primary" style="margin-top:16px" onclick="updateFortuneFromBirthday()">운세 다시 보기</button>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+</div>
+
+<script type="module" src="./app.js"></script>
+</body>
+</html>
+
