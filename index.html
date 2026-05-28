@@ -2,10 +2,13 @@
 <html lang="ko" data-theme="light">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <meta name="theme-color" content="#F4F1EA">
 <meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="한담">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="format-detection" content="telephone=no">
 <link rel="manifest" href="./manifest.webmanifest">
 <title>한담 (Handam)</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
@@ -25,8 +28,8 @@
             <div class="brand-mark"><i class="fa-solid fa-feather-pointed"></i></div>
             <span class="brand-name">HANDAM · 한담</span>
           </div>
-          <div class="muted" style="font-size:13px;font-weight:700">5월 18일 일요일</div>
-          <h1 class="h-page" style="margin-top:3px">좋은 아침이에요,<br>한담님 ☀️</h1>
+          <div class="muted" style="font-size:13px;font-weight:700" id="home-date">오늘</div>
+          <h1 class="h-page" style="margin-top:3px" id="home-greeting">좋은 아침이에요,<br>한담님 ☀️</h1>
         </div>
         <button class="iconbtn" onclick="toggleTheme()" id="theme-btn"><i class="fa-solid fa-moon"></i></button>
       </div>
@@ -68,8 +71,8 @@
       <div class="card tap reveal" style="--d:.17s;margin-top:14px;background:var(--accent-soft);border-color:transparent"
            onclick="go('prompts')">
         <span class="eyebrow"><i class="fa-solid fa-wand-magic-sparkles"></i> AI 글감 추천</span>
-        <p style="font-size:15px;font-weight:800;line-height:1.55;margin-top:9px;color:var(--text)">
-          지난 주말의 설렘, 아직 글로 남기지 않으셨네요.
+        <p style="font-size:15px;font-weight:800;line-height:1.55;margin-top:9px;color:var(--text)" id="home-prompt-teaser">
+          오늘의 글감을 확인해보세요.
         </p>
         <div style="display:flex;align-items:center;gap:6px;margin-top:12px;
                     font-size:13px;font-weight:800;color:var(--accent)">
@@ -171,7 +174,7 @@
   <div id="page-diary" class="page">
     <div class="pad">
       <div class="reveal" style="--d:.02s;padding:16px 0 6px">
-        <span class="eyebrow">5월 18일 · 일요일</span>
+        <span class="eyebrow" id="diary-date-label">오늘</span>
         <h1 class="h-page" style="margin-top:5px">오늘을 기록해요</h1>
       </div>
 
@@ -268,7 +271,7 @@
       <div class="card prompt-card tap reveal prompt-slot" style="--d:.12s;margin-top:14px" onclick="startPromptDiary(this)">
         <div style="display:flex;justify-content:space-between;align-items:center">
           <span class="match"><i class="fa-solid fa-bolt"></i> 추천도 98%</span>
-          <span style="font-size:20px">🍜</span>
+          <span class="prompt-emoji" style="font-size:20px">🍜</span>
         </div>
         <h3 style="font-size:16px;font-weight:800;margin-top:11px">가장 행복했던 한 끼</h3>
         <p class="soft" style="font-size:13px;font-weight:600;line-height:1.6;margin-top:6px">
@@ -279,7 +282,7 @@
       <div class="card prompt-card tap reveal prompt-slot" style="--d:.17s;margin-top:12px" onclick="startPromptDiary(this)">
         <div style="display:flex;justify-content:space-between;align-items:center">
           <span class="match"><i class="fa-solid fa-bolt"></i> 추천도 85%</span>
-          <span style="font-size:20px">🌱</span>
+          <span class="prompt-emoji" style="font-size:20px">🌱</span>
         </div>
         <h3 style="font-size:16px;font-weight:800;margin-top:11px">나를 성장시킨 실수</h3>
         <p class="soft" style="font-size:13px;font-weight:600;line-height:1.6;margin-top:6px">
@@ -290,7 +293,7 @@
       <div class="card prompt-card tap reveal prompt-slot" style="--d:.22s;margin-top:12px" onclick="startPromptDiary(this)">
         <div style="display:flex;justify-content:space-between;align-items:center">
           <span class="match"><i class="fa-solid fa-bolt"></i> 추천도 72%</span>
-          <span style="font-size:20px">💌</span>
+          <span class="prompt-emoji" style="font-size:20px">💌</span>
         </div>
         <h3 style="font-size:16px;font-weight:800;margin-top:11px">1년 뒤의 나에게</h3>
         <p class="soft" style="font-size:13px;font-weight:600;line-height:1.6;margin-top:6px">
@@ -310,10 +313,11 @@
       <div class="reveal" style="--d:.02s;padding:16px 0 6px"><h1 class="h-page">내 정보</h1></div>
 
       <div class="card reveal" style="--d:.06s;margin-top:14px;display:flex;align-items:center;gap:14px">
-        <div class="avatar">정</div>
+        <div class="avatar" id="settings-avatar">한</div>
         <div style="flex:1">
-          <div style="font-size:17px;font-weight:800">정한담</div>
-          <div class="muted" style="font-size:12px;font-weight:600">jmh@example.com</div>
+          <div style="font-size:17px;font-weight:800" id="settings-display-name">한담</div>
+          <div class="muted" style="font-size:12px;font-weight:600" id="settings-email">로그인이 필요해요</div>
+          <div class="muted" style="font-size:11px;font-weight:600;margin-top:3px" id="settings-phone">등록된 연락처 없음</div>
         </div>
         <span class="chip" style="background:var(--accent-soft);color:var(--accent)">한담 PRO</span>
       </div>
@@ -508,7 +512,7 @@
 
   <!-- ============ LOGIN ============ -->
   <div id="page-login" class="page">
-    <div class="pad">
+    <div class="pad auth-pad">
       <div class="reveal" style="--d:.02s;padding:40px 0 18px">
         <div class="brand">
           <div class="brand-mark"><i class="fa-solid fa-feather-pointed"></i></div>
@@ -516,21 +520,179 @@
         </div>
         <h1 class="h-page" style="margin-top:10px">다시 한담을<br>시작해볼까요?</h1>
       </div>
-      <div class="card reveal" style="--d:.07s">
-        <label class="field-label">이메일</label>
-        <input class="input" id="login-email" type="email" value="" placeholder="you@example.com">
-        <label class="field-label" style="margin-top:14px">비밀번호</label>
-        <input class="input" id="login-password" type="password" value="" placeholder="비밀번호">
+      <div class="seg reveal" style="--d:.06s;margin-top:4px">
+        <button type="button" class="on" data-auth-mode="login" data-mode="email">이메일</button>
+        <button type="button" data-auth-mode="login" data-mode="phone">전화번호</button>
       </div>
-      <button class="btn btn-primary reveal" style="--d:.12s;margin-top:16px" onclick="login()">
-        <i class="fa-solid fa-right-to-bracket"></i> 로그인
-      </button>
-      <button class="btn btn-line reveal" style="--d:.14s;margin-top:10px" onclick="register()">
-        <i class="fa-solid fa-user-plus"></i> 회원가입
-      </button>
-      <button class="btn btn-line reveal" style="--d:.16s;margin-top:10px" onclick="loginWithGoogle()">
+      <div id="login-panel-email" class="card reveal" style="--d:.07s;margin-top:12px">
+        <label class="field-label">이메일</label>
+        <input class="input" id="login-email" type="email" value="" placeholder="you@example.com" autocomplete="email">
+        <label class="field-label" style="margin-top:14px">비밀번호</label>
+        <input class="input" id="login-password" type="password" value="" placeholder="비밀번호" autocomplete="current-password">
+        <button class="btn btn-primary" style="margin-top:16px" onclick="login()">
+          <i class="fa-solid fa-right-to-bracket"></i> 로그인
+        </button>
+      </div>
+      <div id="login-panel-phone" class="card reveal" style="--d:.07s;margin-top:12px;display:none">
+        <label class="field-label">전화번호</label>
+        <input class="input" id="login-phone" type="tel" placeholder="01012345678" autocomplete="tel">
+        <button class="btn btn-primary" style="margin-top:16px" onclick="sendLoginPhoneOtp()">
+          <i class="fa-solid fa-mobile-screen"></i> 인증번호 받기
+        </button>
+      </div>
+      <div id="login-panel-otp" class="card reveal" style="--d:.07s;margin-top:12px;display:none">
+        <label class="field-label">인증번호 6자리</label>
+        <input class="input" id="login-otp" type="text" inputmode="numeric" maxlength="6" placeholder="123456" autocomplete="one-time-code">
+        <button class="btn btn-primary" style="margin-top:16px" onclick="verifyLoginPhoneOtp()">
+          <i class="fa-solid fa-circle-check"></i> 인증 완료
+        </button>
+      </div>
+      <div id="recaptcha-login"></div>
+      <button class="btn btn-line reveal" style="--d:.14s;margin-top:10px" onclick="loginWithGoogle()">
         <i class="fa-brands fa-google"></i> Google로 로그인
       </button>
+      <div class="auth-links reveal" style="--d:.16s">
+        <button type="button" class="text-link" onclick="go('signup')">회원가입</button>
+        <span class="muted">·</span>
+        <button type="button" class="text-link" onclick="go('find-account')">아이디/비밀번호 찾기</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ SIGNUP ============ -->
+  <div id="page-signup" class="page">
+    <div class="pad auth-pad">
+      <div class="backbar reveal" style="--d:.02s">
+        <button class="iconbtn" onclick="go('login')"><i class="fa-solid fa-arrow-left"></i></button>
+        <h1 class="h-page">회원가입</h1>
+      </div>
+      <p class="muted reveal" style="--d:.05s;font-size:13px;font-weight:600;line-height:1.55">
+        이메일 또는 전화번호 인증으로 가입할 수 있어요.
+      </p>
+      <div class="seg reveal" style="--d:.06s;margin-top:10px">
+        <button type="button" class="on" data-auth-mode="signup" data-mode="email">이메일 가입</button>
+        <button type="button" data-auth-mode="signup" data-mode="phone">전화번호 가입</button>
+      </div>
+      <div id="signup-panel-email" class="card reveal" style="--d:.07s;margin-top:12px">
+        <label class="field-label">이름 (표시 이름)</label>
+        <input class="input" id="signup-name" type="text" placeholder="예: 한담" autocomplete="name">
+        <label class="field-label" style="margin-top:14px">이메일</label>
+        <input class="input" id="signup-email" type="email" placeholder="you@example.com" autocomplete="email">
+        <label class="field-label" style="margin-top:14px">전화번호 (선택)</label>
+        <input class="input" id="signup-phone" type="tel" placeholder="01012345678" autocomplete="tel">
+        <label class="field-label" style="margin-top:14px">비밀번호</label>
+        <input class="input" id="signup-password" type="password" placeholder="6자 이상" autocomplete="new-password">
+        <label class="field-label" style="margin-top:14px">비밀번호 확인</label>
+        <input class="input" id="signup-password-confirm" type="password" placeholder="한 번 더 입력" autocomplete="new-password">
+        <button class="btn btn-primary" style="margin-top:16px" onclick="registerFromSignup()">
+          <i class="fa-solid fa-user-plus"></i> 이메일로 가입
+        </button>
+      </div>
+      <div id="signup-panel-phone" class="card reveal" style="--d:.07s;margin-top:12px;display:none">
+        <label class="field-label">이름 (표시 이름)</label>
+        <input class="input" id="signup-name-phone" type="text" placeholder="예: 한담" oninput="document.getElementById('signup-name').value=this.value">
+        <label class="field-label" style="margin-top:14px">전화번호</label>
+        <input class="input" id="signup-phone-auth" type="tel" placeholder="01012345678" autocomplete="tel">
+        <button class="btn btn-primary" style="margin-top:16px" onclick="sendSignupPhoneOtp()">
+          <i class="fa-solid fa-mobile-screen"></i> 인증번호 받기
+        </button>
+      </div>
+      <div id="signup-panel-otp" class="card reveal" style="--d:.07s;margin-top:12px;display:none">
+        <label class="field-label">인증번호 6자리</label>
+        <input class="input" id="signup-otp" type="text" inputmode="numeric" maxlength="6" placeholder="123456" autocomplete="one-time-code">
+        <button class="btn btn-primary" style="margin-top:16px" onclick="verifySignupPhoneOtp()">
+          <i class="fa-solid fa-circle-check"></i> 가입 완료
+        </button>
+      </div>
+      <div id="recaptcha-signup"></div>
+      <div class="auth-links reveal" style="--d:.14s">
+        <button type="button" class="text-link" onclick="go('login')">이미 계정이 있어요</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ FIND ACCOUNT ============ -->
+  <div id="page-find-account" class="page">
+    <div class="pad auth-pad">
+      <div class="backbar reveal" style="--d:.02s">
+        <button class="iconbtn" onclick="go('login')"><i class="fa-solid fa-arrow-left"></i></button>
+        <h1 class="h-page">계정 찾기</h1>
+      </div>
+      <div class="seg reveal" style="--d:.06s;margin-top:10px" id="find-tabs">
+        <button type="button" class="on" data-find-tab="password">비밀번호 찾기</button>
+        <button type="button" data-find-tab="id">아이디 확인</button>
+      </div>
+      <div id="find-panel-password" class="reveal" style="--d:.1s;margin-top:14px">
+        <div class="card">
+          <label class="field-label">가입 이메일</label>
+          <input class="input" id="find-email" type="email" placeholder="가입 시 사용한 이메일">
+          <p class="muted" style="font-size:12px;font-weight:600;line-height:1.55;margin-top:12px">
+            입력한 이메일로 비밀번호 재설정 링크를 보내드려요.
+          </p>
+        </div>
+        <button class="btn btn-primary" style="margin-top:16px" onclick="sendPasswordReset()">
+          <i class="fa-solid fa-envelope"></i> 재설정 메일 보내기
+        </button>
+      </div>
+      <div id="find-panel-id" class="reveal" style="--d:.1s;margin-top:14px;display:none">
+        <div class="card">
+          <label class="field-label">이메일 일부 입력</label>
+          <input class="input" id="find-id-email" type="text" placeholder="예: han 또는 @gmail">
+          <p class="muted" style="font-size:12px;font-weight:600;line-height:1.55;margin-top:12px">
+            이 기기에 로그인 기록이 있으면 마스킹된 이메일을 보여드려요.
+          </p>
+        </div>
+        <button class="btn btn-primary" style="margin-top:16px" onclick="showFindHint()">
+          <i class="fa-solid fa-magnifying-glass"></i> 확인하기
+        </button>
+        <p id="find-id-result" class="find-hint" style="display:none"></p>
+      </div>
+      <div class="auth-links reveal" style="--d:.16s">
+        <button type="button" class="text-link" onclick="go('login')">로그인으로 돌아가기</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ ADMIN ============ -->
+  <div id="page-admin" class="page">
+    <div class="pad auth-pad">
+      <div class="backbar reveal" style="--d:.02s">
+        <button class="iconbtn" onclick="adminLogout()"><i class="fa-solid fa-arrow-left"></i></button>
+        <h1 class="h-page">관리자</h1>
+      </div>
+      <p id="admin-firebase-hint" class="find-hint reveal" style="--d:.05s;display:none">
+        FIREBASE_SERVICE_ACCOUNT 환경 변수를 설정하면 유저 목록·활동 추적·비밀번호 초기화가 활성화됩니다.
+      </p>
+      <div class="admin-stat-grid reveal" style="--d:.06s;margin-top:14px">
+        <div class="card admin-stat">
+          <div class="muted" style="font-size:11px;font-weight:800">전체 유저</div>
+          <div class="admin-stat-num" id="admin-total-users">0</div>
+        </div>
+        <div class="card admin-stat">
+          <div class="muted" style="font-size:11px;font-weight:800">활동 중 (<span id="admin-active-window">15</span>분)</div>
+          <div class="admin-stat-num" id="admin-active-users">0</div>
+        </div>
+      </div>
+      <div class="reveal" style="--d:.1s;margin:20px 4px 10px;display:flex;justify-content:space-between;align-items:center">
+        <span class="h-sec">유저 목록</span>
+        <button class="text-link" type="button" onclick="renderAdminUsers()">새로고침</button>
+      </div>
+      <div class="card reveal" style="--d:.12s;padding:8px" id="admin-user-list"></div>
+      <div class="reveal" style="--d:.16s;margin:22px 4px 10px"><span class="h-sec">관리자 계정 설정</span></div>
+      <div class="card reveal" style="--d:.18s">
+        <label class="field-label">현재 관리자 비밀번호</label>
+        <input class="input" id="admin-current-password" type="password" placeholder="현재 비밀번호">
+        <label class="field-label" style="margin-top:14px">새 관리자 아이디</label>
+        <input class="input" id="admin-new-username" type="text" placeholder="변경 시에만 입력">
+        <label class="field-label" style="margin-top:14px">새 관리자 비밀번호</label>
+        <input class="input" id="admin-new-password" type="password" placeholder="변경 시에만 입력">
+        <button class="btn btn-primary" style="margin-top:16px" onclick="saveAdminCredentials()">
+          <i class="fa-solid fa-shield-halved"></i> 관리자 정보 저장
+        </button>
+      </div>
+      <p class="muted reveal" style="--d:.22s;font-size:11px;font-weight:600;text-align:center;margin-top:14px;line-height:1.55">
+        기본 로그인: admin / admin · Firebase Admin SDK 필요
+      </p>
     </div>
   </div>
 

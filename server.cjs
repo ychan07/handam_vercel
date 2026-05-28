@@ -298,6 +298,92 @@ async function handleApi(req, res, url) {
       return true;
     }
 
+    if (url.pathname === "/api/presence") {
+      const adminCore = require("./api/_adminCore");
+      const { uid, email, displayName, phone } = await readBody(req);
+      if (!uid) {
+        sendJson(res, 400, { error: "uid is required" });
+        return true;
+      }
+      if (adminCore.hasFirebaseAdmin()) {
+        await adminCore.touchPresence(uid, { email: email || null, displayName: displayName || null, phone: phone || null });
+      }
+      sendJson(res, 200, { ok: true });
+      return true;
+    }
+
+    if (url.pathname === "/api/admin/login") {
+      const adminCore = require("./api/_adminCore");
+      const { username, password } = await readBody(req);
+      try {
+        const data = await adminCore.adminLogin(username, password);
+        sendJson(res, 200, data);
+      } catch (error) {
+        sendJson(res, 401, { error: error.message || "Unauthorized" });
+      }
+      return true;
+    }
+
+    if (url.pathname === "/api/admin/stats") {
+      const adminCore = require("./api/_adminCore");
+      const { adminToken } = await readBody(req);
+      if (!adminCore.verifyAdminToken(adminToken)) {
+        sendJson(res, 401, { error: "관리자 인증이 필요합니다." });
+        return true;
+      }
+      try {
+        const stats = await adminCore.getAdminStats();
+        sendJson(res, 200, stats);
+      } catch (error) {
+        sendJson(res, 500, { error: error.message || "Server error" });
+      }
+      return true;
+    }
+
+    if (url.pathname === "/api/admin/users") {
+      const adminCore = require("./api/_adminCore");
+      const { adminToken } = await readBody(req);
+      if (!adminCore.verifyAdminToken(adminToken)) {
+        sendJson(res, 401, { error: "관리자 인증이 필요합니다." });
+        return true;
+      }
+      try {
+        const users = await adminCore.getAdminUsers();
+        sendJson(res, 200, { users });
+      } catch (error) {
+        sendJson(res, 500, { error: error.message || "Server error" });
+      }
+      return true;
+    }
+
+    if (url.pathname === "/api/admin/reset-password") {
+      const adminCore = require("./api/_adminCore");
+      const { adminToken, uid, newPassword } = await readBody(req);
+      if (!adminCore.verifyAdminToken(adminToken)) {
+        sendJson(res, 401, { error: "관리자 인증이 필요합니다." });
+        return true;
+      }
+      try {
+        const result = await adminCore.resetUserPassword(uid, newPassword);
+        sendJson(res, 200, result);
+      } catch (error) {
+        sendJson(res, 500, { error: error.message || "Server error" });
+      }
+      return true;
+    }
+
+    if (url.pathname === "/api/admin/credentials") {
+      const adminCore = require("./api/_adminCore");
+      const { adminToken, currentPassword, newUsername, newPassword } = await readBody(req);
+      try {
+        const data = await adminCore.changeAdminCredentials(adminToken, currentPassword, newUsername, newPassword);
+        sendJson(res, 200, data);
+      } catch (error) {
+        sendJson(res, 400, { error: error.message || "Bad request" });
+      }
+      return true;
+    }
+
     if (url.pathname === "/api/fortune") {
       const { birthday } = await readBody(req);
       const urlTemplate = process.env.FORTUNE_API_URL;

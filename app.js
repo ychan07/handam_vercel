@@ -8,6 +8,10 @@ import {
   signInWithPopup,
   signOut,
   updatePassword,
+  updateProfile,
+  sendPasswordResetEmail,
+  RecaptchaVerifier,
+  signInWithPhoneNumber,
   EmailAuthProvider,
   reauthenticateWithCredential,
   GoogleAuthProvider,
@@ -31,43 +35,194 @@ analyticsSupported()
   })
   .catch(() => {});
 
-const state = { selectedRecordId: null, records: [], auth: null, fortuneScore: 95, selectedPrompt: "" };
+const state = {
+  selectedRecordId: null,
+  records: [],
+  auth: null,
+  profile: null,
+  admin: null,
+  fortuneScore: 95,
+  selectedPrompt: "",
+  phoneConfirmation: null,
+};
 const googleProvider = new GoogleAuthProvider();
+const AUTH_PAGES = new Set(["login", "signup", "find-account", "admin"]);
+let recaptchaLogin = null;
+let recaptchaSignup = null;
+let presenceTimer = null;
 let dbWorker, workerSeq = 0;
 const workerWaiters = new Map();
 const promptRotation = { 행복: 0, 평온: 0, 설렘: 0, 차분: 0, 지침: 0, default: 0 };
 const promptByMood = {
   행복: [
-    ["98%", "🍜", "가장 행복했던 한 끼", "최근 기록에서 좋은 순간이 많았어요. 기억나는 맛을 적어볼까요?"],
-    ["91%", "🎉", "웃음이 터졌던 장면", "오늘 가장 크게 웃었던 순간을 구체적으로 남겨보세요."],
-    ["84%", "🌞", "기분 좋은 습관", "행복을 키워준 작은 습관 하나를 써볼까요?"],
+    { emoji: "🍜", title: "가장 행복했던 한 끼", desc: "최근 기록에서 좋은 순간이 많았어요. 기억나는 맛을 적어볼까요?", keywords: ["음식", "맛", "식사", "밥", "카페", "먹"] },
+    { emoji: "🎉", title: "웃음이 터졌던 장면", desc: "오늘 가장 크게 웃었던 순간을 구체적으로 남겨보세요.", keywords: ["웃", "친구", "즐거", "행복", "축하"] },
+    { emoji: "🌞", title: "기분 좋은 습관", desc: "행복을 키워준 작은 습관 하나를 써볼까요?", keywords: ["습관", "루틴", "아침", "운동", "산책"] },
   ],
   평온: [
-    ["97%", "🌙", "요즘 나를 쉬게 하는 것", "평온했던 루틴 하나를 떠올려 보세요."],
-    ["90%", "☕", "조용했던 순간", "오늘 가장 조용하고 편안했던 장면을 기록해보세요."],
-    ["83%", "🍃", "천천히 숨 쉬던 때", "마음이 안정됐던 순간을 문장으로 남겨보세요."],
+    { emoji: "🌙", title: "요즘 나를 쉬게 하는 것", desc: "평온했던 루틴 하나를 떠올려 보세요.", keywords: ["휴식", "잠", "차", "조용", "편안"] },
+    { emoji: "☕", title: "조용했던 순간", desc: "오늘 가장 조용하고 편안했던 장면을 기록해보세요.", keywords: ["조용", "혼자", "카페", "창가", "바람"] },
+    { emoji: "🍃", title: "천천히 숨 쉬던 때", desc: "마음이 안정됐던 순간을 문장으로 남겨보세요.", keywords: ["호흡", "명상", "산책", "하늘", "평온"] },
   ],
   설렘: [
-    ["96%", "✨", "기대되는 내일", "요즘 가장 기다려지는 일은 무엇인가요?"],
-    ["89%", "🚀", "새로 시작한 도전", "새롭게 시작한 일의 첫 감정을 기록해보세요."],
-    ["82%", "💡", "아이디어가 번뜩인 순간", "떠오른 아이디어를 놓치지 말고 남겨보세요."],
+    { emoji: "✨", title: "기대되는 내일", desc: "요즘 가장 기다려지는 일은 무엇인가요?", keywords: ["기대", "내일", "계획", "여행", "만남"] },
+    { emoji: "🚀", title: "새로 시작한 도전", desc: "새롭게 시작한 일의 첫 감정을 기록해보세요.", keywords: ["시작", "도전", "프로젝트", "공부", "새로"] },
+    { emoji: "💡", title: "아이디어가 번뜩인 순간", desc: "떠오른 아이디어를 놓치지 말고 남겨보세요.", keywords: ["아이디어", "영감", "떠오", "계획", "꿈"] },
   ],
   차분: [
-    ["95%", "📷", "사진처럼 남은 순간", "오늘을 한 장면으로 고른다면 무엇인가요?"],
-    ["88%", "🪴", "작게 나아진 부분", "어제보다 나아진 점 하나만 써도 충분해요."],
-    ["81%", "✍️", "생각 정리 노트", "머릿속을 정리하듯 중요한 생각을 써보세요."],
+    { emoji: "📷", title: "사진처럼 남은 순간", desc: "오늘을 한 장면으로 고른다면 무엇인가요?", keywords: ["사진", "풍경", "하늘", "거리", "기억"] },
+    { emoji: "🪴", title: "작게 나아진 부분", desc: "어제보다 나아진 점 하나만 써도 충분해요.", keywords: ["성장", "배움", "조금", "나아", "변화"] },
+    { emoji: "✍️", title: "생각 정리 노트", desc: "머릿속을 정리하듯 중요한 생각을 써보세요.", keywords: ["생각", "정리", "고민", "결정", "메모"] },
   ],
   지침: [
-    ["94%", "🛌", "오늘 나를 버티게 한 것", "힘들었지만 버틸 수 있었던 이유를 적어보세요."],
-    ["87%", "🤍", "나를 위로하는 한마디", "오늘의 나에게 들려주고 싶은 말을 남겨보세요."],
-    ["80%", "🌧️", "무거운 마음 정리", "지친 마음을 그대로 적어도 괜찮아요."],
+    { emoji: "🛌", title: "오늘 나를 버티게 한 것", desc: "힘들었지만 버틸 수 있었던 이유를 적어보세요.", keywords: ["힘", "버티", "지침", "피곤", "위로"] },
+    { emoji: "🤍", title: "나를 위로하는 한마디", desc: "오늘의 나에게 들려주고 싶은 말을 남겨보세요.", keywords: ["위로", "나에게", "괜찮", "쉬", "마음"] },
+    { emoji: "🌧️", title: "무거운 마음 정리", desc: "지친 마음을 그대로 적어도 괜찮아요.", keywords: ["무거", "슬픔", "걱정", "스트레스", "힘들"] },
   ],
   default: [
-    ["93%", "💌", "1년 뒤의 나에게", "미래의 나에게 전하고 싶은 마음을 적어보세요."],
-    ["86%", "🧭", "다음 주의 작은 약속", "가볍게 실천할 수 있는 약속 하나를 정해보세요."],
-    ["79%", "🌱", "나를 성장시킨 경험", "최근 배운 점을 짧게 정리해보세요."],
+    { emoji: "💌", title: "1년 뒤의 나에게", desc: "미래의 나에게 전하고 싶은 마음을 적어보세요.", keywords: ["미래", "목표", "꿈", "약속", "편지"] },
+    { emoji: "🧭", title: "다음 주의 작은 약속", desc: "가볍게 실천할 수 있는 약속 하나를 정해보세요.", keywords: ["약속", "계획", "실천", "다음", "주"] },
+    { emoji: "🌱", title: "나를 성장시킨 경험", desc: "최근 배운 점을 짧게 정리해보세요.", keywords: ["배움", "경험", "성장", "교훈", "깨달"] },
   ],
 };
+
+function profileStorageKey(uid) { return `handam-profile-${uid || "guest"}`; }
+function loadProfile(uid) {
+  try { return JSON.parse(localStorage.getItem(profileStorageKey(uid)) || "null"); } catch (_e) { return null; }
+}
+function saveProfile(uid, patch) {
+  const prev = loadProfile(uid) || {};
+  const next = { ...prev, ...patch, updatedAt: new Date().toISOString() };
+  localStorage.setItem(profileStorageKey(uid), JSON.stringify(next));
+  if (state.auth?.uid === uid) state.profile = next;
+  return next;
+}
+function getDisplayName() {
+  const p = state.profile;
+  if (p?.displayName) return p.displayName;
+  const user = auth.currentUser;
+  if (user?.displayName) return user.displayName;
+  const phone = p?.phone || user?.phoneNumber || state.auth?.phone;
+  if (phone) return phone.replace(/^\+82/, "0");
+  const email = state.auth?.email || user?.email || "";
+  if (email.includes("@")) return email.split("@")[0];
+  return "한담";
+}
+function normalizePhoneKR(input) {
+  const digits = String(input || "").replace(/\D/g, "");
+  if (!digits) return "";
+  if (digits.startsWith("82")) return `+${digits}`;
+  if (digits.startsWith("0")) return `+82${digits.slice(1)}`;
+  if (digits.length >= 9 && digits.length <= 11) return `+82${digits}`;
+  return `+${digits}`;
+}
+function formatPhoneDisplay(e164) {
+  if (!e164) return "";
+  const digits = e164.replace(/\D/g, "");
+  if (digits.startsWith("82")) {
+    const local = `0${digits.slice(2)}`;
+    return local.replace(/(\d{3})(\d{3,4})(\d{4})/, "$1-$2-$3");
+  }
+  return e164;
+}
+function resetRecaptcha(instance) {
+  if (!instance) return null;
+  try { instance.clear(); } catch (_e) {}
+  return null;
+}
+function ensureRecaptcha(containerId, refKey) {
+  const el = document.getElementById(containerId);
+  if (!el) throw new Error("reCAPTCHA 컨테이너를 찾을 수 없습니다.");
+  if (refKey === "login") {
+    recaptchaLogin = resetRecaptcha(recaptchaLogin);
+    recaptchaLogin = new RecaptchaVerifier(auth, el, { size: "invisible" });
+    return recaptchaLogin;
+  }
+  recaptchaSignup = resetRecaptcha(recaptchaSignup);
+  recaptchaSignup = new RecaptchaVerifier(auth, el, { size: "invisible" });
+  return recaptchaSignup;
+}
+function setAuthMode(mode, prefix) {
+  const emailPanel = document.getElementById(`${prefix}-panel-email`);
+  const phonePanel = document.getElementById(`${prefix}-panel-phone`);
+  const otpPanel = document.getElementById(`${prefix}-panel-otp`);
+  if (emailPanel) emailPanel.style.display = mode === "email" ? "block" : "none";
+  if (phonePanel) phonePanel.style.display = mode === "phone" && !state.phoneConfirmation ? "block" : "none";
+  if (otpPanel) otpPanel.style.display = mode === "phone" && state.phoneConfirmation ? "block" : "none";
+  document.querySelectorAll(`[data-auth-mode="${prefix}"]`).forEach((btn) => {
+    btn.classList.toggle("on", btn.dataset.mode === mode);
+  });
+}
+function adminHeaders() {
+  return state.admin?.token ? { "Content-Type": "application/json", "X-Admin-Token": state.admin.token } : { "Content-Type": "application/json" };
+}
+async function adminApi(path, payload) {
+  const data = await apiPost(path, { adminToken: state.admin?.token, ...(payload || {}) });
+  return data;
+}
+async function sendPresenceHeartbeat() {
+  if (!state.auth?.uid || state.auth.isLocalAdmin || state.auth.isAdmin) return;
+  try {
+    await apiPost("/api/presence", {
+      uid: state.auth.uid,
+      email: state.auth.email || null,
+      phone: state.profile?.phone || auth.currentUser?.phoneNumber || null,
+      displayName: getDisplayName(),
+    });
+  } catch (_e) {}
+}
+function startPresenceHeartbeat() {
+  clearInterval(presenceTimer);
+  sendPresenceHeartbeat();
+  presenceTimer = setInterval(sendPresenceHeartbeat, 60 * 1000);
+}
+function stopPresenceHeartbeat() {
+  clearInterval(presenceTimer);
+  presenceTimer = null;
+}
+function getGreeting() {
+  const hour = new Date().getHours();
+  if (hour < 12) return "좋은 아침이에요";
+  if (hour < 18) return "좋은 오후예요";
+  return "좋은 저녁이에요";
+}
+function formatTodayLabel() {
+  const now = new Date();
+  const weekdays = ["일", "월", "화", "수", "목", "금", "토"];
+  return `${now.getMonth() + 1}월 ${now.getDate()}일 ${weekdays[now.getDay()]}요일`;
+}
+function updateUserUI() {
+  const name = getDisplayName();
+  const greeting = getGreeting();
+  const el = (id) => document.getElementById(id);
+  if (el("home-greeting")) el("home-greeting").innerHTML = `${greeting},<br>${name}님 ☀️`;
+  if (el("home-date")) el("home-date").textContent = formatTodayLabel();
+  if (el("settings-display-name")) el("settings-display-name").textContent = name;
+  if (el("settings-email")) el("settings-email").textContent = state.auth?.email || state.profile?.email || "로그인이 필요해요";
+  const phoneText = state.profile?.phone || state.auth?.phone || auth.currentUser?.phoneNumber;
+  if (el("settings-phone")) el("settings-phone").textContent = phoneText ? formatPhoneDisplay(phoneText) : "등록된 연락처 없음";
+  if (el("settings-avatar")) el("settings-avatar").textContent = name.slice(0, 1);
+  if (el("diary-date-label")) el("diary-date-label").textContent = formatTodayLabel();
+}
+function buildDiaryCorpus(records) {
+  return records.map((r) => `${r.title} ${r.body} ${r.summary || ""} ${r.mood}`).join(" ").toLowerCase();
+}
+function calculatePromptScore(prompt, moodKey, context) {
+  const { topMood, recentRecords, corpus } = context;
+  let score = 52;
+  if (moodKey === topMood) score += 26;
+  else if (moodKey === "default") score += 10;
+  const keywords = prompt.keywords || [];
+  let hits = 0;
+  for (const kw of keywords) { if (corpus.includes(kw.toLowerCase())) hits += 1; }
+  score += Math.min(24, hits * 7);
+  score += Math.min(8, recentRecords.length);
+  const recentTitles = recentRecords.map((r) => r.title);
+  if (!recentTitles.some((t) => t.includes(prompt.title.slice(0, 3)))) score += 6;
+  const moodCount = recentRecords.filter((r) => r.mood === topMood).length;
+  if (moodCount >= 3 && moodKey === topMood) score += 5;
+  return Math.max(68, Math.min(99, Math.round(score)));
+}
 
 function callWorker(type, payload = {}) { return new Promise((resolve, reject) => { const id = ++workerSeq; workerWaiters.set(id, { resolve, reject }); dbWorker.postMessage({ id, type, payload }); }); }
 function persistSerialized(result) { if (result?.serialized) localStorage.setItem("handam-sqlite", JSON.stringify(result.serialized)); }
@@ -78,8 +233,21 @@ function fileToBase64(file) { return new Promise((resolve, reject) => { const re
 function currentPageId() { return document.querySelector(".page.active")?.id?.replace("page-", "") || ""; }
 async function setAuthFromUser(user) {
   const idToken = await user.getIdToken();
-  state.auth = { uid: user.uid, email: user.email, idToken };
+  state.auth = {
+    uid: user.uid,
+    email: user.email || null,
+    phone: user.phoneNumber || null,
+    idToken,
+  };
+  state.profile = loadProfile(user.uid);
+  const patch = {};
+  if (!state.profile?.displayName && user.displayName) patch.displayName = user.displayName;
+  if (!state.profile?.email && user.email) patch.email = user.email;
+  if (!state.profile?.phone && user.phoneNumber) patch.phone = user.phoneNumber;
+  if (Object.keys(patch).length) state.profile = saveProfile(user.uid, patch);
   localStorage.setItem("handam-auth", JSON.stringify(state.auth));
+  updateUserUI();
+  startPresenceHeartbeat();
 }
 function authErrorMessage(error) {
   const code = error?.code || "";
@@ -91,10 +259,38 @@ function authErrorMessage(error) {
   }
   if (code === "auth/popup-closed-by-user") return "로그인 창이 닫혔어요. 다시 시도해주세요.";
   if (code === "auth/operation-not-allowed") return "해당 로그인 방식이 비활성화되어 있어요. Firebase Console에서 활성화해주세요.";
+  if (code === "auth/invalid-phone-number") return "전화번호 형식을 확인해주세요. (예: 01012345678)";
+  if (code === "auth/too-many-requests") return "요청이 너무 많아요. 잠시 후 다시 시도해주세요.";
+  if (code === "auth/invalid-verification-code") return "인증번호가 올바르지 않아요.";
+  if (code === "auth/code-expired") return "인증번호가 만료되었어요. 다시 요청해주세요.";
+  if (code === "auth/captcha-check-failed") return "reCAPTCHA 인증에 실패했어요. 새로고침 후 다시 시도해주세요.";
   return error?.message || "인증 처리에 실패했어요.";
 }
+function bindAuthModeTabs() {
+  document.querySelectorAll("[data-auth-mode]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const prefix = btn.dataset.authMode;
+      const mode = btn.dataset.mode;
+      state.phoneConfirmation = null;
+      setAuthMode(mode, prefix);
+    });
+  });
+}
 
-function go(id) { const target = document.getElementById("page-" + id); if (!target) return; document.querySelectorAll(".page").forEach((p) => p.classList.toggle("active", p === target)); document.querySelectorAll(".nav-item").forEach((n) => n.classList.toggle("active", n.dataset.page === id)); target.scrollTop = 0; if (id === "diary") resetOCR(); if (id === "fortune") setTimeout(animateGauge, 160); if (id === "records") renderRecordsPage(); if (id === "prompts") renderPromptRecommendations(); }
+function go(id) {
+  const target = document.getElementById("page-" + id);
+  if (!target) return;
+  document.querySelectorAll(".page").forEach((p) => p.classList.toggle("active", p === target));
+  document.querySelectorAll(".nav-item").forEach((n) => n.classList.toggle("active", n.dataset.page === id));
+  document.querySelector(".device")?.classList.toggle("auth-mode", AUTH_PAGES.has(id));
+  target.scrollTop = 0;
+  if (id === "diary") resetOCR();
+  if (id === "fortune") setTimeout(animateGauge, 160);
+  if (id === "records") renderRecordsPage();
+  if (id === "prompts") renderPromptRecommendations();
+  if (id === "home" || id === "settings") updateUserUI();
+  if (id === "admin") loadAdminDashboard();
+}
 function applyTheme(t) { document.documentElement.setAttribute("data-theme", t); document.getElementById("theme-btn").innerHTML = t === "dark" ? '<i class="fa-solid fa-sun"></i>' : '<i class="fa-solid fa-moon"></i>'; const darkSwitch = document.getElementById("dark-switch"); if (darkSwitch) darkSwitch.classList.toggle("on", t === "dark"); localStorage.setItem("handam-theme", t); }
 function toggleTheme(event) { if (event) event.stopPropagation(); const cur = document.documentElement.getAttribute("data-theme"); applyTheme(cur === "dark" ? "light" : "dark"); }
 function toggleSwitch(event, element, message) { if (event) event.stopPropagation(); element.classList.toggle("on"); if (message) showToast(message); }
@@ -161,16 +357,25 @@ function renderPromptRecommendations() {
   const pool = promptByMood[key];
   const offset = promptRotation[key] % pool.length;
   const picks = [pool[offset % pool.length], pool[(offset + 1) % pool.length], pool[(offset + 2) % pool.length]];
+  const recentRecords = state.records.slice(0, 14);
+  const context = { topMood: key, recentRecords, corpus: buildDiaryCorpus(recentRecords) };
   const cards = document.querySelectorAll(".prompt-slot");
   cards.forEach((card, index) => {
-    const data = picks[index];
-    card.querySelector(".match").innerHTML = `<i class="fa-solid fa-bolt"></i> 추천도 ${data[0]}`;
-    card.querySelector('span[style*="font-size:20px"]').textContent = data[1];
-    card.querySelector("h3").textContent = data[2];
-    card.querySelector("p").textContent = data[3];
+    const prompt = picks[index];
+    const score = calculatePromptScore(prompt, key, context);
+    card.dataset.score = String(score);
+    card.querySelector(".match").innerHTML = `<i class="fa-solid fa-bolt"></i> 추천도 ${score}%`;
+    card.querySelector(".prompt-emoji").textContent = prompt.emoji;
+    card.querySelector("h3").textContent = prompt.title;
+    card.querySelector("p").textContent = prompt.desc;
   });
   const meta = document.getElementById("prompt-meta");
-  meta.innerHTML = `최근 일기 <b style="color:var(--text)">${recentCount}편</b>을 분석해<br>감정 "${key === "default" ? "균형" : key}" 중심으로 글감을 골랐어요.`;
+  const topScore = Math.max(...[...cards].map((c) => Number(c.dataset.score || 0)));
+  meta.innerHTML = `최근 일기 <b style="color:var(--text)">${recentCount}편</b>을 분석해<br>감정 "${key === "default" ? "균형" : key}" 기준 · 최고 추천도 <b style="color:var(--text)">${topScore}%</b>`;
+  const homePrompt = document.getElementById("home-prompt-teaser");
+  if (homePrompt && picks[0]) {
+    homePrompt.textContent = `${getDisplayName()}님, "${picks[0].title}" 글감이 오늘 가장 잘 맞아요.`;
+  }
 }
 
 function refreshPrompts() { const { topMood } = dominantMoodFromRecent(); const key = promptByMood[topMood] ? topMood : "default"; promptRotation[key] += 1; renderPromptRecommendations(); showToast("새 글감을 골랐어요"); }
@@ -188,21 +393,25 @@ function renderRecordsPage() { const box = document.getElementById("records-list
 async function reloadRecords() { state.records = await callWorker("list"); renderHomeRecords(); renderRecordsPage(); renderPromptRecommendations(); }
 async function deleteCurrentRecord() { if (!state.selectedRecordId) return; const result = await callWorker("delete", { id: state.selectedRecordId }); persistSerialized(result); state.selectedRecordId = null; await reloadRecords(); showToast("기록을 삭제했어요."); go("records"); }
 
+async function loginAsAdmin(username, password) {
+  const data = await apiPost("/api/admin/login", { username, password });
+  state.admin = { token: data.token, username: data.username };
+  sessionStorage.setItem("handam-admin", JSON.stringify(state.admin));
+  state.auth = { uid: "admin", email: null, isAdmin: true };
+  showToast("관리자 로그인 성공");
+  go("admin");
+}
 async function login() {
   const email = document.getElementById("login-email").value.trim();
   const password = document.getElementById("login-password").value.trim();
   if (!email || !password) return showToast("이메일과 비밀번호를 입력해주세요.");
 
   if (email === "admin" && password === "admin") {
-    state.auth = {
-      uid: "local-admin",
-      email: "admin@local.test",
-      idToken: "local-admin-token",
-      isLocalAdmin: true,
-    };
-    localStorage.setItem("handam-auth", JSON.stringify(state.auth));
-    showToast("로그인 성공");
-    go("home");
+    try {
+      await loginAsAdmin("admin", "admin");
+    } catch (error) {
+      showToast(error.message || "관리자 로그인에 실패했어요.");
+    }
     return;
   }
 
@@ -215,22 +424,127 @@ async function login() {
     showToast(authErrorMessage(error));
   }
 }
-async function register() {
-  const email = document.getElementById("login-email").value.trim();
-  const password = document.getElementById("login-password").value.trim();
-  if (!email || !password) return showToast("이메일과 비밀번호를 입력해주세요.");
+async function sendLoginPhoneOtp() {
+  const phone = normalizePhoneKR(document.getElementById("login-phone").value.trim());
+  if (!phone) return showToast("전화번호를 입력해주세요.");
   try {
-    await createUserWithEmailAndPassword(auth, email, password);
-    showToast("회원가입 완료, 로그인해주세요.");
+    const verifier = ensureRecaptcha("recaptcha-login", "login");
+    state.phoneConfirmation = await signInWithPhoneNumber(auth, phone, verifier);
+    setAuthMode("phone", "login");
+    showToast("인증번호를 발송했어요.");
   } catch (error) {
     showToast(authErrorMessage(error));
   }
 }
+async function verifyLoginPhoneOtp() {
+  const code = document.getElementById("login-otp").value.trim();
+  if (!code || !state.phoneConfirmation) return showToast("인증번호를 입력해주세요.");
+  try {
+    const credential = await state.phoneConfirmation.confirm(code);
+    state.phoneConfirmation = null;
+    await setAuthFromUser(credential.user);
+    saveProfile(credential.user.uid, {
+      phone: credential.user.phoneNumber,
+      displayName: getDisplayName(),
+    });
+    showToast("전화번호 로그인 성공");
+    go("home");
+  } catch (error) {
+    showToast(authErrorMessage(error));
+  }
+}
+async function sendSignupPhoneOtp() {
+  const displayName = (document.getElementById("signup-name-phone")?.value || document.getElementById("signup-name")?.value || "").trim();
+  const phoneRaw = document.getElementById("signup-phone-auth").value.trim();
+  const phone = normalizePhoneKR(phoneRaw);
+  if (!displayName) return showToast("이름을 입력해주세요.");
+  if (!phone) return showToast("전화번호를 입력해주세요.");
+  try {
+    const verifier = ensureRecaptcha("recaptcha-signup", "signup");
+    state.phoneConfirmation = await signInWithPhoneNumber(auth, phone, verifier);
+    sessionStorage.setItem("handam-pending-name", displayName);
+    setAuthMode("phone", "signup");
+    const otpPanel = document.getElementById("signup-panel-otp");
+    const phonePanel = document.getElementById("signup-panel-phone");
+    if (otpPanel) otpPanel.style.display = "block";
+    if (phonePanel) phonePanel.style.display = "none";
+    showToast("인증번호를 발송했어요.");
+  } catch (error) {
+    showToast(authErrorMessage(error));
+  }
+}
+async function verifySignupPhoneOtp() {
+  const code = document.getElementById("signup-otp").value.trim();
+  if (!code || !state.phoneConfirmation) return showToast("인증번호를 입력해주세요.");
+  try {
+    const credential = await state.phoneConfirmation.confirm(code);
+    const displayName = sessionStorage.getItem("handam-pending-name") || "한담";
+    await updateProfile(credential.user, { displayName });
+    saveProfile(credential.user.uid, {
+      displayName,
+      phone: credential.user.phoneNumber,
+    });
+    state.phoneConfirmation = null;
+    sessionStorage.removeItem("handam-pending-name");
+    await setAuthFromUser(credential.user);
+    showToast(`${displayName}님, 가입을 환영해요!`);
+    go("home");
+  } catch (error) {
+    showToast(authErrorMessage(error));
+  }
+}
+async function registerFromSignup() {
+  const displayName = document.getElementById("signup-name").value.trim();
+  const email = document.getElementById("signup-email").value.trim();
+  const phone = document.getElementById("signup-phone").value.trim();
+  const password = document.getElementById("signup-password").value;
+  const confirm = document.getElementById("signup-password-confirm").value;
+  if (!displayName) return showToast("이름을 입력해주세요.");
+  if (!email) return showToast("이메일을 입력해주세요.");
+  if (!password || password.length < 6) return showToast("비밀번호는 6자 이상이어야 해요.");
+  if (password !== confirm) return showToast("비밀번호 확인이 일치하지 않아요.");
+  try {
+    const credential = await createUserWithEmailAndPassword(auth, email, password);
+    await updateProfile(credential.user, { displayName });
+    saveProfile(credential.user.uid, { displayName, email, phone: phone || null });
+    await setAuthFromUser(credential.user);
+    showToast(`${displayName}님, 가입을 환영해요!`);
+    go("home");
+  } catch (error) {
+    showToast(authErrorMessage(error));
+  }
+}
+async function sendPasswordReset() {
+  const email = document.getElementById("find-email").value.trim();
+  if (!email) return showToast("가입 시 사용한 이메일을 입력해주세요.");
+  try {
+    await sendPasswordResetEmail(auth, email);
+    showToast("비밀번호 재설정 메일을 보냈어요. 메일함을 확인해주세요.");
+  } catch (error) {
+    showToast(authErrorMessage(error));
+  }
+}
+function showFindHint() {
+  const email = document.getElementById("find-id-email").value.trim();
+  const hint = document.getElementById("find-id-result");
+  if (!email) return showToast("이메일 일부를 입력해주세요.");
+  const stored = state.auth?.email || "";
+  if (stored && stored.toLowerCase().includes(email.toLowerCase())) {
+    const masked = stored.replace(/(^.).*(@.*$)/, "$1***$2");
+    hint.textContent = `현재 기기에 저장된 계정: ${masked}`;
+    hint.style.display = "block";
+    return;
+  }
+  hint.textContent = "이 기기에는 해당 정보가 없어요. 가입 시 사용한 이메일 전체로 비밀번호 찾기를 이용해주세요.";
+  hint.style.display = "block";
+}
 async function loginWithGoogle() {
   try {
     const credential = await signInWithPopup(auth, googleProvider);
-    await setAuthFromUser(credential.user);
-    showToast("Google 로그인 성공");
+    const user = credential.user;
+    if (user.displayName) saveProfile(user.uid, { displayName: user.displayName, email: user.email });
+    await setAuthFromUser(user);
+    showToast(`${getDisplayName()}님, 환영해요!`);
     go("home");
   } catch (error) {
     showToast(authErrorMessage(error));
@@ -238,14 +552,118 @@ async function loginWithGoogle() {
 }
 async function logout() {
   try {
-    if (!state.auth?.isLocalAdmin) {
+    if (state.auth && !state.auth.isAdmin && !state.auth.isLocalAdmin) {
       await signOut(auth);
     }
   } catch (_error) {}
   state.auth = null;
+  state.profile = null;
+  state.admin = null;
+  state.phoneConfirmation = null;
   localStorage.removeItem("handam-auth");
+  sessionStorage.removeItem("handam-admin");
+  stopPresenceHeartbeat();
+  updateUserUI();
   showToast("로그아웃했어요.");
   go("login");
+}
+function adminLogout() {
+  state.admin = null;
+  state.auth = null;
+  sessionStorage.removeItem("handam-admin");
+  showToast("관리자 로그아웃했어요.");
+  go("login");
+}
+async function loadAdminDashboard() {
+  if (!state.admin?.token) return go("login");
+  try {
+    const stats = await adminApi("/api/admin/stats");
+    document.getElementById("admin-total-users").textContent = String(stats.totalUsers ?? 0);
+    document.getElementById("admin-active-users").textContent = String(stats.activeUsers ?? 0);
+    document.getElementById("admin-active-window").textContent = String(stats.activeWindowMinutes ?? 15);
+    const hint = document.getElementById("admin-firebase-hint");
+    if (hint) {
+      hint.style.display = stats.firebaseConfigured ? "none" : "block";
+    }
+    await renderAdminUsers();
+  } catch (error) {
+    showToast(error.message || "관리자 데이터를 불러오지 못했어요.");
+  }
+}
+async function renderAdminUsers() {
+  const box = document.getElementById("admin-user-list");
+  if (!box) return;
+  box.innerHTML = '<div class="muted" style="padding:16px;font-weight:700">불러오는 중…</div>';
+  try {
+    const data = await adminApi("/api/admin/users");
+    const users = data.users || [];
+    if (!users.length) {
+      box.innerHTML = '<div class="muted" style="padding:16px;font-weight:700">등록된 사용자가 없습니다.</div>';
+      return;
+    }
+    box.innerHTML = "";
+    users.forEach((user) => {
+      const row = document.createElement("div");
+      row.className = "admin-user-row";
+      const label = user.displayName || user.email || formatPhoneDisplay(user.phone) || user.uid;
+      const contact = user.email || formatPhoneDisplay(user.phone) || "-";
+      const canResetPassword = Boolean(user.email);
+      row.innerHTML = `
+        <div class="admin-user-main">
+          <div style="font-size:14px;font-weight:800">${label}</div>
+          <div class="muted" style="font-size:11px;font-weight:600;margin-top:3px">${contact}</div>
+          <div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap">
+            <span class="chip ${user.active ? "emo-calm" : ""}">${user.active ? "활동 중" : "비활성"}</span>
+            <span class="chip">${(user.providers || []).join(", ") || "provider 없음"}</span>
+          </div>
+        </div>
+        ${canResetPassword ? `<div class="admin-user-actions">
+          <input class="input admin-reset-input" type="password" placeholder="새 비밀번호" data-uid="${user.uid}">
+          <button class="btn btn-line admin-reset-btn" type="button" data-uid="${user.uid}">초기화</button>
+        </div>` : `<div class="muted" style="font-size:11px;font-weight:600">전화번호 전용 계정 (비밀번호 초기화 불가)</div>`}
+      `;
+      box.appendChild(row);
+    });
+    box.querySelectorAll(".admin-reset-btn").forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        const uid = btn.dataset.uid;
+        const input = box.querySelector(`.admin-reset-input[data-uid="${uid}"]`);
+        const newPassword = input?.value?.trim();
+        if (!newPassword || newPassword.length < 6) return showToast("6자 이상 비밀번호를 입력해주세요.");
+        try {
+          await adminApi("/api/admin/reset-password", { uid, newPassword });
+          if (input) input.value = "";
+          showToast("비밀번호를 초기화했어요.");
+        } catch (error) {
+          showToast(error.message || "비밀번호 초기화에 실패했어요.");
+        }
+      });
+    });
+  } catch (error) {
+    box.innerHTML = `<div class="muted" style="padding:16px;font-weight:700">${error.message || "목록 로드 실패"}</div>`;
+  }
+}
+async function saveAdminCredentials() {
+  if (!state.admin?.token) return showToast("관리자 로그인이 필요해요.");
+  const currentPassword = document.getElementById("admin-current-password").value;
+  const newUsername = document.getElementById("admin-new-username").value.trim();
+  const newPassword = document.getElementById("admin-new-password").value;
+  if (!currentPassword) return showToast("현재 관리자 비밀번호를 입력해주세요.");
+  try {
+    const data = await apiPost("/api/admin/credentials", {
+      adminToken: state.admin.token,
+      currentPassword,
+      newUsername: newUsername || undefined,
+      newPassword: newPassword || undefined,
+    });
+    state.admin = { token: data.token, username: data.username };
+    sessionStorage.setItem("handam-admin", JSON.stringify(state.admin));
+    document.getElementById("admin-current-password").value = "";
+    document.getElementById("admin-new-password").value = "";
+    showToast("관리자 계정 정보를 변경했어요.");
+  } catch (error) {
+    showToast(error.message || "관리자 정보 변경에 실패했어요.");
+  }
 }
 async function changePassword() {
   const currentPassword = document.getElementById("password-current").value.trim();
@@ -297,13 +715,46 @@ window.deleteCurrentRecord = deleteCurrentRecord;
 window.go = go; window.toggleTheme = toggleTheme; window.toggleSwitch = toggleSwitch;
 window.openCameraOCR = openCameraOCR; window.openGalleryOCR = openGalleryOCR; window.resetOCR = resetOCR; window.saveDiary = saveDiary;
 window.refreshPrompts = refreshPrompts; window.startPromptDiary = startPromptDiary; window.saveManualDiary = saveManualDiary;
-window.updateFortuneFromBirthday = updateFortuneFromBirthday; window.logout = logout; window.login = login; window.register = register;
+window.updateFortuneFromBirthday = updateFortuneFromBirthday; window.logout = logout; window.login = login;
 window.loginWithGoogle = loginWithGoogle;
+window.registerFromSignup = registerFromSignup;
+window.sendPasswordReset = sendPasswordReset;
+window.showFindHint = showFindHint;
+window.sendLoginPhoneOtp = sendLoginPhoneOtp;
+window.verifyLoginPhoneOtp = verifyLoginPhoneOtp;
+window.sendSignupPhoneOtp = sendSignupPhoneOtp;
+window.verifySignupPhoneOtp = verifySignupPhoneOtp;
+window.adminLogout = adminLogout;
+window.saveAdminCredentials = saveAdminCredentials;
+window.renderAdminUsers = renderAdminUsers;
 window.changePassword = changePassword; window.exportDiaries = exportDiaries; window.showToast = showToast; window.openSheet = openSheet; window.closeSheet = closeSheet;
+
+function bindFindAccountTabs() {
+  document.querySelectorAll("[data-find-tab]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const tab = btn.dataset.findTab;
+      document.querySelectorAll("[data-find-tab]").forEach((b) => b.classList.toggle("on", b === btn));
+      document.getElementById("find-panel-password").style.display = tab === "password" ? "block" : "none";
+      document.getElementById("find-panel-id").style.display = tab === "id" ? "block" : "none";
+    });
+  });
+}
+
+(function preventPinchZoom() {
+  document.addEventListener("gesturestart", (e) => e.preventDefault(), { passive: false });
+  let lastTouchEnd = 0;
+  document.addEventListener("touchend", (e) => {
+    const now = Date.now();
+    if (now - lastTouchEnd <= 300) e.preventDefault();
+    lastTouchEnd = now;
+  }, { passive: false });
+})();
 
 (async function bootstrap() {
   applyTheme(localStorage.getItem("handam-theme") || "light");
-  bindMoodPicker("#emo-pick"); bindMoodPicker("#manual-mood"); bindSegmentButtons();
+  bindMoodPicker("#emo-pick"); bindMoodPicker("#manual-mood"); bindSegmentButtons(); bindFindAccountTabs(); bindAuthModeTabs();
+  setAuthMode("email", "login");
+  setAuthMode("email", "signup");
   fillBirthdaySelects();
   document.getElementById("ocr-camera-file").addEventListener("change", (e) => runOCRFile(e.target.files?.[0]));
   document.getElementById("ocr-gallery-file").addEventListener("change", (e) => runOCRFile(e.target.files?.[0]));
@@ -311,11 +762,22 @@ window.changePassword = changePassword; window.exportDiaries = exportDiaries; wi
   document.getElementById("filter-date").addEventListener("change", renderRecordsPage);
   await initWorker(); await reloadRecords();
   onAuthStateChanged(auth, async (user) => {
-    if (!user) return;
+    if (!user || state.auth?.isAdmin) return;
     await setAuthFromUser(user);
-    if (currentPageId() === "login") go("home");
+    if (["login", "signup", "find-account"].includes(currentPageId())) go("home");
   });
+  try { state.admin = JSON.parse(sessionStorage.getItem("handam-admin") || "null"); } catch (_error) { state.admin = null; }
   try { state.auth = JSON.parse(localStorage.getItem("handam-auth") || "null"); } catch (_error) { state.auth = null; }
-  if (state.auth) go("home"); else go("login");
+  if (state.auth?.uid && !state.auth.isAdmin) state.profile = loadProfile(state.auth.uid);
+  updateUserUI();
+  if (state.admin?.token) {
+    state.auth = { uid: "admin", isAdmin: true };
+    go("admin");
+  } else if (state.auth && !state.auth.isAdmin) {
+    startPresenceHeartbeat();
+    go("home");
+  } else {
+    go("login");
+  }
 })();
 
