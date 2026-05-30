@@ -171,8 +171,8 @@ input,textarea,select{font-size:16px}
   animation-delay:var(--d,0s);
 }
 @keyframes reveal-in{
-  from{opacity:0;transform:translateY(28px) scale(.96);filter:blur(10px)}
-  55%{opacity:1;filter:blur(2px)}
+  from{opacity:0;transform:translateY(24px) scale(.97);filter:blur(6px)}
+  55%{opacity:1;filter:blur(1px)}
   to{opacity:1;transform:translateY(0) scale(1);filter:blur(0)}
 }
 .page.active .reveal{animation-name:reveal-in}

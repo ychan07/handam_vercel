@@ -57,6 +57,7 @@ const promptRotation = { default: 0 };
 let promptByMood = {};
 let emotionOptions = [];
 let fortuneData = null;
+let greetingData = null;
 
 function profileStorageKey(uid) { return `handam-profile-${uid || "guest"}`; }
 function loadProfile(uid) {
@@ -114,14 +115,35 @@ function escapeHtml(text) {
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;");
 }
+const FALLBACK_GREETINGS = [
+  { start: 5, end: 11, emoji: "☀️", messages: ["상쾌한 아침이에요"] },
+  { start: 11, end: 14, emoji: "🍱", messages: ["좋은 점심이에요"] },
+  { start: 14, end: 18, emoji: "🌤️", messages: ["따뜻한 오후예요"] },
+  { start: 18, end: 22, emoji: "🌆", messages: ["편안한 저녁이에요"] },
+  { start: 22, end: 2, wrap: true, emoji: "🌙", messages: ["선선한 밤이에요"] },
+  { start: 2, end: 5, emoji: "🌌", messages: ["고요한 새벽이에요"] },
+];
+function greetingSlots() {
+  return greetingData?.greetings?.length ? greetingData.greetings : FALLBACK_GREETINGS;
+}
+function greetingMatchesHour(slot, hour) {
+  const start = slot.start ?? 0;
+  const end = slot.end ?? 24;
+  if (slot.wrap || start > end) return hour >= start || hour < end;
+  return hour >= start && hour < end;
+}
+function getGreetingSlot(hour = new Date().getHours()) {
+  const slots = greetingSlots();
+  return slots.find((slot) => greetingMatchesHour(slot, hour)) || slots[slots.length - 1];
+}
 function getGreeting() {
-  const hour = new Date().getHours();
-  if (hour >= 5 && hour < 11) return "상쾌한 아침이에요";
-  if (hour >= 11 && hour < 14) return "좋은 점심이에요";
-  if (hour >= 14 && hour < 18) return "따뜻한 오후예요";
-  if (hour >= 18 && hour < 22) return "편안한 저녁이에요";
-  if (hour >= 22 || hour < 2) return "선선한 밤이에요";
-  return "고요한 새벽이에요";
+  const slot = getGreetingSlot();
+  const messages = slot?.messages?.length ? slot.messages : ["안녕하세요"];
+  const seed = fortuneSeed(`${formatDateKey(new Date())}|greeting`, String(slot?.start ?? 0));
+  return fortunePick(messages, seed);
+}
+function getGreetingEmoji() {
+  return getGreetingSlot()?.emoji || "☀️";
 }
 function buildPromptByMoodFromJson(json) {
   const map = {};
@@ -215,9 +237,10 @@ function renderMoodFilter() {
 }
 async function loadAppData() {
   try {
-    const [promptsRes, fortuneRes] = await Promise.all([
+    const [promptsRes, fortuneRes, greetingRes] = await Promise.all([
       fetch("./data/prompts.json"),
       fetch("./data/fortune.json"),
+      fetch("./data/greeting.json"),
     ]);
     if (promptsRes.ok) {
       const promptsJson = await promptsRes.json();
@@ -230,6 +253,9 @@ async function loadAppData() {
     if (fortuneRes.ok) {
       fortuneData = await fortuneRes.json();
       if (state.fortuneBirthday) refreshFortune();
+    }
+    if (greetingRes.ok) {
+      greetingData = await greetingRes.json();
     }
   } catch (_error) {
     console.warn("앱 데이터 JSON 로드 실패 — 기본값 사용");
@@ -368,9 +394,10 @@ function updateDiaryStatsUI() {
 function updateUserUI() {
   const name = getDisplayName();
   const greeting = getGreeting();
+  const greetingEmoji = getGreetingEmoji();
   const el = (id) => document.getElementById(id);
   if (el("home-greeting")) {
-    el("home-greeting").innerHTML = `${greeting},<br><span class="home-greeting-name">${escapeHtml(name)}</span>님 ☀️`;
+    el("home-greeting").innerHTML = `${greeting},<br><span class="home-greeting-name">${escapeHtml(name)}</span>님 ${greetingEmoji}`;
   }
   if (el("home-date")) el("home-date").textContent = formatTodayLabel();
   if (el("settings-display-name")) el("settings-display-name").textContent = name;
