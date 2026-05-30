@@ -1,6 +1,7 @@
 ﻿import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { getAnalytics, isSupported as analyticsSupported } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-analytics.js";
 import { initInteractions, refreshInteractions } from "./interactions.js";
+import { animatePromptRefresh } from "./prompt-animations.js";
 import {
   getAuth,
   onAuthStateChanged,
@@ -440,11 +441,13 @@ function renderPromptRecommendations() {
   }
 }
 
-function refreshPrompts() {
+async function refreshPrompts() {
+  const refreshBtn = document.getElementById("prompt-refresh-btn");
+  if (refreshBtn?.disabled) return;
   const analysis = analyzeEmotionsFromRecent(14);
   const key = analysis.total === 0 ? "default" : (promptByMood[analysis.dominantMood] ? analysis.dominantMood : "default");
   promptRotation[key] = (promptRotation[key] || 0) + 1;
-  renderPromptRecommendations();
+  await animatePromptRefresh(() => renderPromptRecommendations());
   showToast("새 글감을 골랐어요");
 }
 function startPromptDiary(card) { const title = card.querySelector("h3").textContent; state.selectedPrompt = title; document.getElementById("manual-title").value = title; document.getElementById("manual-body").value = ""; showToast(`글감 "${title}"으로 직접 입력 화면을 열었어요.`); go("manual"); }
