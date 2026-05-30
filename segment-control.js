@@ -2,6 +2,8 @@
  * Elastic segmented control — react-bits ElasticSlider spring-style pill glide.
  */
 
+import { getAnimations } from "./animations.js";
+
 const SEG_SPRING = "cubic-bezier(0.34, 1.45, 0.64, 1)";
 
 function prefersReducedMotion() {
@@ -61,7 +63,7 @@ function moveSegPill(seg, { animate = true } = {}) {
         offset: 1,
       },
     ],
-    { duration: 520, easing: SEG_SPRING, fill: "forwards" }
+    { duration: getAnimations().segment?.pillDurationMs ?? 520, easing: SEG_SPRING, fill: "forwards" }
   );
 
   pill.style.width = `${w}px`;

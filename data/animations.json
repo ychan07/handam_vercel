@@ -1,0 +1,227 @@
+{
+  // =============================================================================
+  // 한담(Handam) 애니메이션 · 타이밍 설정
+  // -----------------------------------------------------------------------------
+  // - 이 파일은 data/animations.json 으로 배포되며, animations.js 가 로드합니다.
+  // - // 와 /* */ 주석을 사용할 수 있습니다 (표준 JSON 파서는 주석 미지원).
+  // - 숫자 단위: Ms = 밀리초(ms), S = 초(s), Px = 픽셀(px)
+  // - 값을 키우면 느려지고, 줄이면 빨라집니다.
+  // - CSS 변수(--anim-*)로 styles.css 에 반영되는 항목과 JS 전용 항목이 섞여 있습니다.
+  // =============================================================================
+
+  // -----------------------------------------------------------------------------
+  // loading — 앱 최초 진입 · 스플래시(로딩 화면)
+  // 연동: src/ui/SplashScreen.tsx, src/ui-entry.tsx, src/ui/splash.css
+  // -----------------------------------------------------------------------------
+  "loading": {
+    "splash": {
+      // minMs: 스플래시 최소 표시 시간(ms). 타이틀 애니메이션이 끝나도 이 시간까지는 대기합니다.
+      "minMs": 2200,
+      // maxMs: 최대 대기(ms). minMs·타이틀 완료 후에도 이 시간을 넘기면 강제로 종료합니다.
+      "maxMs": 4200,
+      // finishDelayMs: 진행률 100% 후 실제 종료(페이드아웃)까지 대기(ms)
+      "finishDelayMs": 280,
+      // exitMs: 종료 페이드 시작 후 DOM 제거·onDone 호출까지(ms)
+      "exitMs": 520,
+      // revealAppDelayMs: 스플래시 DOM 제거 후 메인 앱 노출까지 지연(ms) — ui-entry revealApp
+      "revealAppDelayMs": 600,
+      // exitFadeDurationS: 스플래시 전체 opacity 0 으로 사라지는 시간(초) — motion.div exit
+      "exitFadeDurationS": 0.5,
+      // markDurationS: 상단 깃털 로고 마크 scale/rotate 인(초)
+      "markDurationS": 0.7,
+      // blurTextDelayMs: "한담" BlurText 글자 간 지연(ms)
+      "blurTextDelayMs": 90,
+      // blurTextStepDurationS: BlurText 각 글자 스텝 길이(초)
+      "blurTextStepDurationS": 0.4,
+      // progressBarDurationS: 하단 프로그레스 바 width 보간(초)
+      "progressBarDurationS": 0.25,
+      // rotatingIntervalMs: "○○ 준비중이에요" 문구 교체 주기(ms)
+      "rotatingIntervalMs": 1800,
+      // rotatingStaggerDurationS: 회전 텍스트 글자 stagger(초)
+      "rotatingStaggerDurationS": 0.025,
+      // rotatingSpring: 회전 텍스트 spring 물리 (damping↑ = 덜 튐, stiffness↑ = 더 빠름)
+      "rotatingSpring": { "damping": 22, "stiffness": 280 },
+      // aurora: 배경 Aurora 셰이더 (amplitude=파동 크기, blend=색 혼합, speed=속도)
+      "aurora": { "amplitude": 1.15, "blend": 0.42, "speed": 0.85 },
+      // shinyTextSpeed: "마음을 담는 하루의 기록" 반짝임 속도(클수록 빠름)
+      "shinyTextSpeed": 2.8,
+      // appEnterDurationS: 스플래시 후 메인 .device 등장 애니메이션(초) — splash.css app-enter
+      "appEnterDurationS": 0.65
+    },
+    "deviceShell": {
+      // fadeDurationS: .device 로딩→표시 시 opacity/transform 전환(초)
+      "fadeDurationS": 0.5
+    }
+  },
+
+  // -----------------------------------------------------------------------------
+  // reveal — 페이지 전환 시 .reveal 요소 (블러 + 아래에서 올라옴)
+  // 연동: styles.css @keyframes reveal-in, app.js replayRevealAnimations()
+  // -----------------------------------------------------------------------------
+  "reveal": {
+    // durationS: 한 요소가 나타나는 전체 시간(초). --anim-reveal-duration
+    "durationS": 0.82,
+    // translateYPx: 시작 Y 이동(px). --anim-reveal-translate-y
+    "translateYPx": 24,
+    // scaleFrom: 시작 scale (1=원본). --anim-reveal-scale-from
+    "scaleFrom": 0.97,
+    // blurFromPx: 시작 blur(px). --anim-reveal-blur-from
+    "blurFromPx": 6,
+    // blurMidPx: 중간 키프레임(55%) blur(px). --anim-reveal-blur-mid
+    "blurMidPx": 1
+  },
+
+  // -----------------------------------------------------------------------------
+  // promptRefresh — 글감 탭 "다른 글감 추천받기" 새로고침 모션
+  // 연동: prompt-animations.js animatePromptRefresh()
+  // -----------------------------------------------------------------------------
+  "promptRefresh": {
+    // exitDurationMs: 카드·요소 페이드아웃 1프레임 길이(ms)
+    "exitDurationMs": 340,
+    // enterDurationMs: 페이드인 1프레임 길이(ms)
+    "enterDurationMs": 520,
+    // cardStaggerMs: 카드마다 exit 시작 지연(ms)
+    "cardStaggerMs": 55,
+    // partStaggerMs: 카드 내부(제목·본문 등) stagger(ms)
+    "partStaggerMs": 35,
+    // metaExitDurationMs: 상단 "최근 일기 분석" 메타 영역 exit(ms)
+    "metaExitDurationMs": 220,
+    // metaEnterDurationMs: 메타 영역 enter(ms)
+    "metaEnterDurationMs": 420,
+    // cardEnterDelayMs: 카드별 enter 시작 지연(ms)
+    "cardEnterDelayMs": 90,
+    // cardEnterPartStaggerMs: enter 시 파트 stagger(ms)
+    "cardEnterPartStaggerMs": 45,
+    // blurExitPx: 사라질 때 blur 강도(px)
+    "blurExitPx": 10,
+    // blurMetaExitPx: 메타 exit blur(px)
+    "blurMetaExitPx": 6,
+    // blurEnterPx: 나타날 때 초기 blur(px)
+    "blurEnterPx": 10,
+    // blurEnterMidPx: enter 중간 키 blur(px)
+    "blurEnterMidPx": 4,
+    // blurMetaEnterPx: 메타 enter blur(px)
+    "blurMetaEnterPx": 8,
+    // translateExitPx: exit 시 위로 이동(px, 양수=위)
+    "translateExitPx": 14,
+    // translateMetaExitPx: 메타 exit 이동(px)
+    "translateMetaExitPx": 6,
+    // translateEnterPx: enter 시작 Y 오프셋(px, 아래에서 올라옴)
+    "translateEnterPx": 18,
+    // translateMetaEnterPx: 메타 enter Y 오프셋(px)
+    "translateMetaEnterPx": 10
+  },
+
+  // -----------------------------------------------------------------------------
+  // interactions — 버튼·카드 터치 피드백 (ClickSpark + ripple)
+  // 연동: interactions.js
+  // -----------------------------------------------------------------------------
+  "interactions": {
+    "spark": {
+      // durationMs: 클릭 스파크 파티클 수명(ms) — .btn-primary, .fab, .fortune-hero
+      "durationMs": 420,
+      // sparkSize: 스파크 선 길이(px)
+      "sparkSize": 9,
+      // sparkRadius: 퍼져 나가는 반경(px)
+      "sparkRadius": 14,
+      // sparkCount: 한 번 클릭 시 파티클 개수
+      "sparkCount": 8
+    },
+    "ripple": {
+      // removeDelayMs: ripple 클래스 제거까지(ms) — press-spring, .iconbtn 등
+      "removeDelayMs": 480
+    }
+  },
+
+  // -----------------------------------------------------------------------------
+  // segment — 설정 화면 탭형 세그먼트(표준/고급, 페르소나 등) pill 슬라이드
+  // 연동: segment-control.js
+  // -----------------------------------------------------------------------------
+  "segment": {
+    // pillDurationMs: 선택 pill 이동 spring 애니메이션(ms)
+    "pillDurationMs": 520
+  },
+
+  // -----------------------------------------------------------------------------
+  // toast — 하단 토스트 메시지
+  // 연동: app.js showToast()
+  // -----------------------------------------------------------------------------
+  "toast": {
+    // durationMs: 토스트 표시 유지 시간(ms)
+    "durationMs": 1900
+  },
+
+  // -----------------------------------------------------------------------------
+  // fortune — 운세 탭 게이지·시트
+  // 연동: app.js go('fortune'), animateGauge(), updateFortuneFromBirthday()
+  // -----------------------------------------------------------------------------
+  "fortune": {
+    // gaugeDelayMs: 운세 페이지 진입 후 원형 게이지 애니 시작 지연(ms)
+    "gaugeDelayMs": 160,
+    // sheetOpenDelayMs: 생일 미입력 시 바텀시트 자동 오픈 지연(ms)
+    "sheetOpenDelayMs": 280,
+    // gaugeInitDelayMs: 생일 저장 직후 게이지 재생 지연(ms)
+    "gaugeInitDelayMs": 100,
+    // gaugeRingTransitionS: 원형 링 stroke-dashoffset 전환(초) — --anim-fortune-ring
+    "gaugeRingTransitionS": 1.55,
+    // adviceBarTransitionS: 분야별 막대 width 전환(초) — --anim-fortune-bar
+    "adviceBarTransitionS": 1.1
+  },
+
+  // -----------------------------------------------------------------------------
+  // sheet — 생년월일 입력 바텀시트 + scrim
+  // 연동: styles.css .scrim, .sheet, app.js openSheet/closeSheet
+  // -----------------------------------------------------------------------------
+  "sheet": {
+    // scrimDurationS: 배경 딤 opacity 전환(초) — --anim-sheet-scrim-duration
+    "scrimDurationS": 0.34,
+    // panelDurationS: 시트 slide-up(초) — --anim-sheet-panel-duration
+    "panelDurationS": 0.48,
+    // scrimBlurPx: scrim 표시 시 backdrop blur(px) — --anim-sheet-scrim-blur
+    "scrimBlurPx": 4,
+    // grabberPopDurationS: 상단 grabber 바 통통 튀는 애니(초)
+    "grabberPopDurationS": 0.5
+  },
+
+  // -----------------------------------------------------------------------------
+  // decorations — 반복·장식용 CSS animation (루프)
+  // 연동: styles.css 각 @keyframes / animation 속성
+  // -----------------------------------------------------------------------------
+  "decorations": {
+    // heroShimmerDurationS: 홈 운세 카드 빛 스윕 — fortune-hero::before
+    "heroShimmerDurationS": 5,
+    // pillGlowDurationS: 운세 점수 pill 글로우 — .score-pill
+    "pillGlowDurationS": 2.5,
+    // fabPulseDurationS: 하단 FAB 그림자 펄스 — .fab
+    "fabPulseDurationS": 3,
+    // promptRefreshSpinDurationS: 글감 새로고침 아이콘 회전 — .prompt-refresh-icon
+    "promptRefreshSpinDurationS": 0.7,
+    // scanDurationS: OCR 스캔 라인 — .scanline
+    "scanDurationS": 1.7,
+    // spinnerDurationS: 로딩 스피너 — .spinner
+    "spinnerDurationS": 0.7,
+    // brandShineDurationS: HANDAM 로고 shine — .brand-mark
+    "brandShineDurationS": 4,
+    // authLogoDurationS: 로그인 화면 로고 등장 — .auth-logo
+    "authLogoDurationS": 0.8,
+    // navDotDurationS: 하단 nav 활성 점 — .nav-item.active::after
+    "navDotDurationS": 0.45,
+    // chipSelectDurationS: 감정 선택 칩 — .emo-opt.sel
+    "chipSelectDurationS": 0.42
+  },
+
+  // -----------------------------------------------------------------------------
+  // easing — CSS transition/animation 타이밍 함수 (cubic-bezier 문자열)
+  // 연동: styles.css :root --ease-* 변수
+  // -----------------------------------------------------------------------------
+  "easing": {
+    // spring: 기본 스프링 느낌 (버튼·카드·토스트 등)
+    "spring": "cubic-bezier(0.22, 1, 0.36, 1)",
+    // outExpo: reveal·로고 등 감속 강조
+    "outExpo": "cubic-bezier(0.16, 0.84, 0.44, 1)",
+    // springBounce: 살짝 튀는 느낌 (주간 dot, grabber, nav)
+    "springBounce": "cubic-bezier(0.34, 1.45, 0.64, 1)",
+    // sheet: 바텀시트 slide
+    "sheet": "cubic-bezier(0.32, 1.1, 0.42, 1)"
+  }
+}

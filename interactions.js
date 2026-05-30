@@ -3,13 +3,22 @@
  * Colors unchanged — motion and press feedback only.
  */
 
-const SPARK_DEFAULTS = {
-  sparkColor: "rgba(255,255,255,0.92)",
-  sparkSize: 9,
-  sparkRadius: 14,
-  sparkCount: 8,
-  duration: 420,
-};
+import { getAnimations } from "./animations.js";
+
+function sparkDefaults() {
+  const spark = getAnimations().interactions?.spark || {};
+  return {
+    sparkColor: "rgba(255,255,255,0.92)",
+    sparkSize: spark.sparkSize ?? 9,
+    sparkRadius: spark.sparkRadius ?? 14,
+    sparkCount: spark.sparkCount ?? 8,
+    duration: spark.durationMs ?? 420,
+  };
+}
+
+function rippleRemoveDelay() {
+  return getAnimations().interactions?.ripple?.removeDelayMs ?? 480;
+}
 
 const boundSparks = new WeakSet();
 const boundRipples = new WeakSet();
@@ -22,7 +31,7 @@ function attachClickSpark(el, options = {}) {
   if (!el || boundSparks.has(el)) return;
   boundSparks.add(el);
 
-  const cfg = { ...SPARK_DEFAULTS, ...options };
+  const cfg = { ...sparkDefaults(), ...options };
   const sparks = [];
   let rafId = 0;
 
@@ -135,7 +144,7 @@ function attachRipple(el) {
   el.addEventListener(
     "pointerup",
     () => {
-      window.setTimeout(() => el.classList.remove("is-rippling"), 480);
+      window.setTimeout(() => el.classList.remove("is-rippling"), rippleRemoveDelay());
     },
     { passive: true }
   );

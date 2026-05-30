@@ -129,7 +129,7 @@ body.is-splash-active .device.app-shell--loading {
 }
 
 body:not(.is-splash-active) .device {
-  animation: app-enter 0.65s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: app-enter var(--anim-splash-app-enter, 0.65s) cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 @keyframes app-enter {

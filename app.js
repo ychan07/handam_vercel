@@ -4,6 +4,13 @@ import { initInteractions, refreshInteractions } from "./interactions.js";
 import { initElasticSegments } from "./segment-control.js";
 import { animatePromptRefresh } from "./prompt-animations.js";
 import {
+  deepMerge,
+  DEFAULT_ANIMATIONS,
+  getAnimations,
+  loadAnimations,
+  parseJsonWithComments,
+} from "./animations.js";
+import {
   getAuth,
   onAuthStateChanged,
   createUserWithEmailAndPassword,
@@ -237,10 +244,11 @@ function renderMoodFilter() {
 }
 async function loadAppData() {
   try {
-    const [promptsRes, fortuneRes, greetingRes] = await Promise.all([
+    const [promptsRes, fortuneRes, greetingRes, animationsRes] = await Promise.all([
       fetch("./data/prompts.json"),
       fetch("./data/fortune.json"),
       fetch("./data/greeting.json"),
+      fetch("./data/animations.json"),
     ]);
     if (promptsRes.ok) {
       const promptsJson = await promptsRes.json();
@@ -257,9 +265,16 @@ async function loadAppData() {
     if (greetingRes.ok) {
       greetingData = await greetingRes.json();
     }
+    if (animationsRes.ok) {
+      window.__HANDAM_ANIMATIONS__ = deepMerge(
+        DEFAULT_ANIMATIONS,
+        parseJsonWithComments(await animationsRes.text())
+      );
+    }
   } catch (_error) {
     console.warn("앱 데이터 JSON 로드 실패 — 기본값 사용");
   }
+  await loadAnimations();
   if (!Object.keys(promptByMood).length) {
     promptByMood = { default: [{ emoji: "✍️", title: "오늘의 한 줄", desc: "오늘 마음을 짧게 남겨보세요.", keywords: [] }] };
   }
@@ -397,7 +412,10 @@ function updateUserUI() {
   const greetingEmoji = getGreetingEmoji();
   const el = (id) => document.getElementById(id);
   if (el("home-greeting")) {
-    el("home-greeting").innerHTML = `${greeting},<br><span class="home-greeting-name">${escapeHtml(name)}</span>님 ${greetingEmoji}`;
+    el("home-greeting").innerHTML =
+      `<span class="home-greeting-line">${escapeHtml(greeting)},</span><br>` +
+      `<span class="home-greeting-name">${escapeHtml(name)}</span>` +
+      `<span class="home-greeting-tail">님 <span class="home-greeting-emoji" role="img" aria-hidden="true">${greetingEmoji}</span></span>`;
   }
   if (el("home-date")) el("home-date").textContent = formatTodayLabel();
   if (el("settings-display-name")) el("settings-display-name").textContent = name;
@@ -559,8 +577,9 @@ function go(id) {
   if (id === "fortune") {
     if (fortuneData && state.fortuneBirthday) refreshFortune();
     renderFortuneUI();
-    setTimeout(animateGauge, 160);
-    if (!state.fortuneBirthday) setTimeout(openSheet, 280);
+    const fortuneAnim = getAnimations().fortune || {};
+    setTimeout(animateGauge, fortuneAnim.gaugeDelayMs ?? 160);
+    if (!state.fortuneBirthday) setTimeout(openSheet, fortuneAnim.sheetOpenDelayMs ?? 280);
   }
   if (id === "records") renderRecordsPage();
   if (id === "prompts") renderPromptRecommendations();
@@ -574,7 +593,14 @@ function go(id) {
 function applyTheme(t) { document.documentElement.setAttribute("data-theme", t); document.getElementById("theme-btn").innerHTML = t === "dark" ? '<i class="fa-solid fa-sun"></i>' : '<i class="fa-solid fa-moon"></i>'; const darkSwitch = document.getElementById("dark-switch"); if (darkSwitch) darkSwitch.classList.toggle("on", t === "dark"); localStorage.setItem("handam-theme", t); }
 function toggleTheme(event) { if (event) event.stopPropagation(); const cur = document.documentElement.getAttribute("data-theme"); applyTheme(cur === "dark" ? "light" : "dark"); }
 function toggleSwitch(event, element, message) { if (event) event.stopPropagation(); element.classList.toggle("on"); if (message) showToast(message); }
-function showToast(message) { const toast = document.getElementById("toast"); toast.textContent = message; toast.classList.add("show"); clearTimeout(window._toastTimer); window._toastTimer = setTimeout(() => toast.classList.remove("show"), 1900); }
+function showToast(message) {
+  const toast = document.getElementById("toast");
+  const duration = getAnimations().toast?.durationMs ?? 1900;
+  toast.textContent = message;
+  toast.classList.add("show");
+  clearTimeout(window._toastTimer);
+  window._toastTimer = setTimeout(() => toast.classList.remove("show"), duration);
+}
 function openSheet() {
   const scrim = document.getElementById("scrim");
   const sheet = document.getElementById("sheet");
@@ -605,7 +631,8 @@ function animateGauge() {
   ring.style.transition = "none";
   ring.style.strokeDashoffset = C;
   ring.getBoundingClientRect();
-  ring.style.transition = "stroke-dashoffset 1.55s cubic-bezier(.22,1,.36,1)";
+  const ringDur = getAnimations().fortune?.gaugeRingTransitionS ?? 1.55;
+  ring.style.transition = `stroke-dashoffset ${ringDur}s cubic-bezier(.22,1,.36,1)`;
   ring.style.strokeDashoffset = C * (1 - target / 100);
   let v = 0;
   const tick = () => {
@@ -1424,7 +1451,7 @@ function updateFortuneFromBirthday() {
   closeSheet();
   renderFortuneUI();
   showToast("오늘의 운세를 계산했어요.");
-  setTimeout(animateGauge, 100);
+  setTimeout(animateGauge, getAnimations().fortune?.gaugeInitDelayMs ?? 100);
 }
 function initFortune() {
   state.fortuneBirthday = loadFortuneBirthday();
