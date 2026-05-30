@@ -189,8 +189,8 @@ input,textarea,select{font-size:16px}
   position:absolute;
   left:var(--ripple-x,50%);
   top:var(--ripple-y,50%);
-  width:140%;
-  aspect-ratio:1;
+  width:min(280px,140%);
+  height:min(280px,140%);
   transform:translate(-50%,-50%) scale(0);
   border-radius:50%;
   background:radial-gradient(circle,rgba(255,255,255,.38) 0%,transparent 68%);
@@ -212,10 +212,13 @@ input,textarea,select{font-size:16px}
   100%{transform:translate(-50%,-50%) scale(1);opacity:0}
 }
 .click-spark-layer{
-  position:absolute;inset:0;width:100%;height:100%;
+  position:absolute!important;inset:0;width:100%!important;height:100%!important;
   pointer-events:none;z-index:3;border-radius:inherit;
+  flex:none!important;align-self:stretch;
 }
-.press-spring > *,.press-card > *,.iconbtn > *{position:relative;z-index:1}
+.press-spring > *:not(.click-spark-layer),
+.press-card > *:not(.click-spark-layer),
+.iconbtn > *:not(.click-spark-layer){position:relative;z-index:1}
 
 /* ===== Typography ===== */
 .eyebrow{font-size:12px;font-weight:800;letter-spacing:.04em;color:var(--accent);text-transform:uppercase}
@@ -270,6 +273,8 @@ input,textarea,select{font-size:16px}
   transition:var(--press-spring);
   transform:translateZ(0);
   will-change:transform;
+  min-height:0;
+  flex-shrink:0;
 }
 .btn.press-spring:active{
   transform:translateY(2px) scale(.972);
