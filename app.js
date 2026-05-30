@@ -157,21 +157,87 @@ function updateUserUI() {
 function buildDiaryCorpus(records) {
   return records.map((r) => `${r.title} ${r.body} ${r.summary || ""} ${r.mood}`).join(" ").toLowerCase();
 }
-function calculatePromptScore(prompt, moodKey, context) {
-  const { topMood, recentRecords, corpus } = context;
-  let score = 52;
-  if (moodKey === topMood) score += 26;
-  else if (moodKey === "default") score += 10;
+const PROMPT_MOOD_KEYS = ["행복", "평온", "설렘", "차분", "지침"];
+
+function analyzeEmotionsFromRecent(maxEntries = 14) {
+  const recent = state.records.slice(0, maxEntries);
+  const counts = {};
+  for (const key of PROMPT_MOOD_KEYS) counts[key] = 0;
+  for (const record of recent) {
+    const mood = record.mood || "";
+    if (PROMPT_MOOD_KEYS.includes(mood)) counts[mood] += 1;
+    else if (mood) counts[mood] = (counts[mood] || 0) + 1;
+  }
+  const total = recent.length;
+  const ranked = Object.entries(counts)
+    .filter(([, count]) => count > 0)
+    .sort((a, b) => b[1] - a[1]);
+  const distribution = {};
+  if (total > 0) {
+    for (const [mood, count] of ranked) {
+      distribution[mood] = Math.round((count / total) * 100);
+    }
+  }
+  const dominantMood = ranked[0]?.[0] || "default";
+  return {
+    recent,
+    total,
+    counts,
+    distribution,
+    dominantMood,
+    ranked,
+    corpus: buildDiaryCorpus(recent),
+  };
+}
+
+function calculatePromptScore(prompt, cardMoodKey, analysis) {
+  const { distribution, total, dominantMood, corpus } = analysis;
+  if (total === 0) return null;
+  const baseKey = PROMPT_MOOD_KEYS.includes(cardMoodKey) ? cardMoodKey : "default";
+  let score = distribution[baseKey] || 0;
   const keywords = prompt.keywords || [];
   let hits = 0;
-  for (const kw of keywords) { if (corpus.includes(kw.toLowerCase())) hits += 1; }
-  score += Math.min(24, hits * 7);
-  score += Math.min(8, recentRecords.length);
-  const recentTitles = recentRecords.map((r) => r.title);
-  if (!recentTitles.some((t) => t.includes(prompt.title.slice(0, 3)))) score += 6;
-  const moodCount = recentRecords.filter((r) => r.mood === topMood).length;
-  if (moodCount >= 3 && moodKey === topMood) score += 5;
-  return Math.max(68, Math.min(99, Math.round(score)));
+  for (const kw of keywords) {
+    if (corpus.includes(kw.toLowerCase())) hits += 1;
+  }
+  score += Math.min(15, hits * 4);
+  if (baseKey === dominantMood) score += 6;
+  const recentTitles = analysis.recent.map((r) => r.title);
+  if (!recentTitles.some((t) => t.includes(prompt.title.slice(0, 3)))) score += 4;
+  return Math.max(5, Math.min(99, Math.round(score)));
+}
+
+function pickPromptCards(analysis) {
+  const { ranked, total } = analysis;
+  if (total === 0) {
+    const pool = promptByMood.default;
+    const offset = promptRotation.default % pool.length;
+    return [0, 1, 2].map((i) => ({
+      prompt: pool[(offset + i) % pool.length],
+      moodKey: "default",
+    }));
+  }
+  const moodSlots = [
+    ranked[0]?.[0],
+    ranked[1]?.[0] || ranked[0]?.[0],
+    ranked[2]?.[0] || ranked[1]?.[0] || ranked[0]?.[0],
+  ].map((m) => (promptByMood[m] ? m : "default"));
+  return moodSlots.map((moodKey, index) => {
+    const pool = promptByMood[moodKey] || promptByMood.default;
+    const offset = (promptRotation[moodKey] || 0) + index;
+    return { prompt: pool[offset % pool.length], moodKey };
+  });
+}
+
+function formatPromptMeta(analysis) {
+  if (analysis.total === 0) {
+    return "아직 분석할 일기가 없어요.<br>기록하면 감정 비율에 맞춰 추천해 드려요.";
+  }
+  const parts = analysis.ranked
+    .slice(0, 4)
+    .map(([mood, count]) => `${mood} <b style="color:var(--text)">${Math.round((count / analysis.total) * 100)}%</b>`);
+  const dominant = analysis.dominantMood;
+  return `최근 <b style="color:var(--text)">${analysis.total}편</b> 감정 분석 · ${parts.join(" · ")}<br>주요 감정 <b style="color:var(--text)">"${dominant}"</b> 기준 글감`;
 }
 
 function callWorker(type, payload = {}) { return new Promise((resolve, reject) => { const id = ++workerSeq; workerWaiters.set(id, { resolve, reject }); dbWorker.postMessage({ id, type, payload }); }); }
@@ -288,43 +354,47 @@ async function saveManualDiary() {
   persistSerialized(result); await reloadRecords(); showToast("직접 입력 일기를 저장했어요."); go("records");
 }
 
-function dominantMoodFromRecent() {
-  const recent = state.records.slice(0, 14);
-  const counts = {};
-  for (const record of recent) counts[record.mood] = (counts[record.mood] || 0) + 1;
-  let topMood = "default", top = -1;
-  Object.entries(counts).forEach(([mood, count]) => { if (count > top) { top = count; topMood = mood; } });
-  return { topMood, recentCount: recent.length };
-}
-
 function renderPromptRecommendations() {
-  const { topMood, recentCount } = dominantMoodFromRecent();
-  const key = promptByMood[topMood] ? topMood : "default";
-  const pool = promptByMood[key];
-  const offset = promptRotation[key] % pool.length;
-  const picks = [pool[offset % pool.length], pool[(offset + 1) % pool.length], pool[(offset + 2) % pool.length]];
-  const recentRecords = state.records.slice(0, 14);
-  const context = { topMood: key, recentRecords, corpus: buildDiaryCorpus(recentRecords) };
+  const analysis = analyzeEmotionsFromRecent(14);
+  const picks = pickPromptCards(analysis);
   const cards = document.querySelectorAll(".prompt-slot");
   cards.forEach((card, index) => {
-    const prompt = picks[index];
-    const score = calculatePromptScore(prompt, key, context);
-    card.dataset.score = String(score);
-    card.querySelector(".match").innerHTML = `<i class="fa-solid fa-bolt"></i> 추천도 ${score}%`;
+    const { prompt, moodKey } = picks[index];
+    const score = calculatePromptScore(prompt, moodKey, analysis);
+    card.dataset.score = score == null ? "" : String(score);
+    card.dataset.mood = moodKey;
+    const matchEl = card.querySelector(".match");
+    if (score == null) {
+      matchEl.innerHTML = `<i class="fa-solid fa-bolt"></i> 일기 기록 후 분석`;
+    } else {
+      const moodLabel = moodKey === "default" ? "균형" : moodKey;
+      matchEl.innerHTML = `<i class="fa-solid fa-bolt"></i> ${moodLabel} 감정 ${score}%`;
+    }
     card.querySelector(".prompt-emoji").textContent = prompt.emoji;
     card.querySelector("h3").textContent = prompt.title;
     card.querySelector("p").textContent = prompt.desc;
   });
   const meta = document.getElementById("prompt-meta");
-  const topScore = Math.max(...[...cards].map((c) => Number(c.dataset.score || 0)));
-  meta.innerHTML = `최근 일기 <b style="color:var(--text)">${recentCount}편</b>을 분석해<br>감정 "${key === "default" ? "균형" : key}" 기준 · 최고 추천도 <b style="color:var(--text)">${topScore}%</b>`;
+  if (meta) meta.innerHTML = formatPromptMeta(analysis);
   const homePrompt = document.getElementById("home-prompt-teaser");
   if (homePrompt && picks[0]) {
-    homePrompt.textContent = `${getDisplayName()}님, "${picks[0].title}" 글감이 오늘 가장 잘 맞아요.`;
+    const top = picks[0];
+    const score = calculatePromptScore(top.prompt, top.moodKey, analysis);
+    if (score == null) {
+      homePrompt.textContent = "오늘의 글감을 확인해보세요.";
+    } else {
+      homePrompt.textContent = `${getDisplayName()}님, "${top.prompt.title}" 글감이 지금 감정에 ${score}% 맞아요.`;
+    }
   }
 }
 
-function refreshPrompts() { const { topMood } = dominantMoodFromRecent(); const key = promptByMood[topMood] ? topMood : "default"; promptRotation[key] += 1; renderPromptRecommendations(); showToast("새 글감을 골랐어요"); }
+function refreshPrompts() {
+  const analysis = analyzeEmotionsFromRecent(14);
+  const key = analysis.total === 0 ? "default" : (promptByMood[analysis.dominantMood] ? analysis.dominantMood : "default");
+  promptRotation[key] = (promptRotation[key] || 0) + 1;
+  renderPromptRecommendations();
+  showToast("새 글감을 골랐어요");
+}
 function startPromptDiary(card) { const title = card.querySelector("h3").textContent; state.selectedPrompt = title; document.getElementById("manual-title").value = title; document.getElementById("manual-body").value = ""; showToast(`글감 "${title}"으로 직접 입력 화면을 열었어요.`); go("manual"); }
 
 function createRecordRow(record) {

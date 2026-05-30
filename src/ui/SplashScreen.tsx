@@ -8,10 +8,27 @@ type SplashScreenProps = {
   onDone: () => void;
 };
 
+const SPLASH_STATUS_LINES = [
+  "글감을 엄선하는 중",
+  "최근 마음 패턴을 살펴보는 중",
+  "오늘의 운세를 준비하는 중",
+  "일기 장을 펼치는 중",
+  "따뜻한 문장을 고르는 중",
+  "한담을 꾸미는 중",
+];
+
 export default function SplashScreen({ onDone }: SplashScreenProps) {
   const [phase, setPhase] = useState<"intro" | "exit" | "gone">("intro");
   const [progress, setProgress] = useState(0);
   const [titleDone, setTitleDone] = useState(false);
+  const [statusIndex, setStatusIndex] = useState(0);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      setStatusIndex((i) => (i + 1) % SPLASH_STATUS_LINES.length);
+    }, 1600);
+    return () => window.clearInterval(timer);
+  }, []);
 
   const finish = useCallback(() => {
     setPhase("exit");
@@ -106,6 +123,18 @@ export default function SplashScreen({ onDone }: SplashScreenProps) {
               />
             </div>
             <p className="splash-hint">잠시만 기다려 주세요</p>
+            <AnimatePresence mode="wait">
+              <motion.p
+                key={statusIndex}
+                className="splash-status"
+                initial={{ opacity: 0, y: 6 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -4 }}
+                transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
+              >
+                {SPLASH_STATUS_LINES[statusIndex]}
+              </motion.p>
+            </AnimatePresence>
           </div>
         </motion.div>
       )}
