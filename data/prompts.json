@@ -1,4 +1,16 @@
 {
+  "emotions": [
+    { "id": "행복", "emoji": "😊", "label": "행복", "chip": "emo-happy" },
+    { "id": "평온", "emoji": "😌", "label": "평온", "chip": "emo-calm" },
+    { "id": "설렘", "emoji": "🥰", "label": "설렘", "chip": "emo-excited" },
+    { "id": "차분", "emoji": "😐", "label": "차분", "chip": "emo-think" },
+    { "id": "지침", "emoji": "😔", "label": "지침", "chip": "emo-tired" },
+    { "id": "감사", "emoji": "🙏", "label": "감사", "chip": "emo-grateful" },
+    { "id": "슬픔", "emoji": "😢", "label": "슬픔", "chip": "emo-sad" },
+    { "id": "분노", "emoji": "😤", "label": "분노", "chip": "emo-angry" },
+    { "id": "불안", "emoji": "😰", "label": "불안", "chip": "emo-anxious" },
+    { "id": "자신", "emoji": "💪", "label": "자신", "chip": "emo-confident" }
+  ],
   "moods": {
     "행복": [
       {
@@ -90,6 +102,51 @@
         "title": "생각 정리 노트",
         "example": "머릿속을 정리하듯 중요한 생각을 써보세요.",
         "keywords": ["생각", "정리", "고민", "결정", "메모"]
+      }
+    ],
+    "감사": [
+      {
+        "emotion": "감사",
+        "emoji": "🙏",
+        "title": "고마웠던 순간",
+        "example": "오늘 고마웠던 사람이나 일을 떠올려 적어보세요.",
+        "keywords": ["감사", "고마", "감동", "은혜"]
+      }
+    ],
+    "슬픔": [
+      {
+        "emotion": "슬픔",
+        "emoji": "😢",
+        "title": "마음이 무거웠던 때",
+        "example": "슬펐던 감정을 있는 그대로 남겨도 괜찮아요.",
+        "keywords": ["슬픔", "눈물", "아픔", "그리움"]
+      }
+    ],
+    "분노": [
+      {
+        "emotion": "분노",
+        "emoji": "😤",
+        "title": "화가 났던 이유",
+        "example": "화가 난 순간, 그때의 마음을 솔직히 적어보세요.",
+        "keywords": ["화", "분노", "짜증", "답답"]
+      }
+    ],
+    "불안": [
+      {
+        "emotion": "불안",
+        "emoji": "😰",
+        "title": "불안했던 마음",
+        "example": "걱정이 커졌던 순간을 차분히 풀어 써보세요.",
+        "keywords": ["불안", "걱정", "초조", "긴장"]
+      }
+    ],
+    "자신": [
+      {
+        "emotion": "자신",
+        "emoji": "💪",
+        "title": "스스로 칭찬하고 싶은 일",
+        "example": "오늘 잘해낸 일 하나를 적어보세요.",
+        "keywords": ["자신", "성취", "칭찬", "잘했"]
       }
     ],
     "지침": [

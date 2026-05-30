@@ -53,8 +53,9 @@ const AUTH_PAGES = new Set(["login", "signup", "find-account", "admin"]);
 let presenceTimer = null;
 let dbWorker, workerSeq = 0;
 const workerWaiters = new Map();
-const promptRotation = { 행복: 0, 평온: 0, 설렘: 0, 차분: 0, 지침: 0, default: 0 };
+const promptRotation = { default: 0 };
 let promptByMood = {};
+let emotionOptions = [];
 let fortuneData = null;
 
 function profileStorageKey(uid) { return `handam-profile-${uid || "guest"}`; }
@@ -135,6 +136,83 @@ function buildPromptByMoodFromJson(json) {
   }
   return map;
 }
+function initPromptRotationKeys() {
+  for (const key of getPromptMoodKeys()) {
+    if (promptRotation[key] == null) promptRotation[key] = 0;
+  }
+  if (promptRotation.default == null) promptRotation.default = 0;
+}
+function loadEmotionsFromJson(json) {
+  if (Array.isArray(json?.emotions) && json.emotions.length) {
+    emotionOptions = json.emotions.map((e) => ({
+      id: e.id || e.label,
+      emoji: e.emoji || "📝",
+      label: e.label || e.id,
+      chip: e.chip || "emo-think",
+    }));
+    return;
+  }
+  emotionOptions = Object.keys(json?.moods || {})
+    .filter((k) => k !== "default")
+    .map((id) => ({ id, emoji: "📝", label: id, chip: "emo-think" }));
+}
+function getPromptMoodKeys() {
+  return emotionOptions.map((e) => e.id).filter((id) => id !== "default" && promptByMood[id]);
+}
+function parseMoodLabel(mood) {
+  const text = String(mood || "").trim();
+  const stripped = text.replace(/^[\p{Extended_Pictographic}\u2600-\u27BF]+\s*/u, "").trim();
+  return stripped || text;
+}
+function getEmotionById(id) {
+  const key = parseMoodLabel(id);
+  return emotionOptions.find((e) => e.id === key || e.label === key);
+}
+function formatMoodForSave(moodId) {
+  const emotion = getEmotionById(moodId);
+  return emotion ? `${emotion.emoji} ${emotion.label}` : moodId;
+}
+function getEmotionChipClass(mood) {
+  return getEmotionById(mood)?.chip || "emo-think";
+}
+function moodMatchesFilter(recordMood, filterId) {
+  if (filterId === "all") return true;
+  return parseMoodLabel(recordMood) === filterId;
+}
+function recordDateKey(record) {
+  if (!record?.createdAt) return "";
+  return toDateKey(new Date(record.createdAt));
+}
+function renderEmotionPickers() {
+  if (!emotionOptions.length) return;
+  const html = emotionOptions
+    .map(
+      (e, index) =>
+        `<div class="emo-opt${index === 0 ? " sel" : ""}" data-mood="${escapeHtml(e.id)}">${e.emoji} ${escapeHtml(e.label)}</div>`
+    )
+    .join("");
+  for (const selector of ["#emo-pick", "#manual-mood"]) {
+    const container = document.querySelector(selector);
+    if (!container) continue;
+    container.innerHTML = html;
+    delete container.dataset.moodBound;
+    bindMoodPicker(selector);
+  }
+  refreshInteractions();
+}
+function renderMoodFilter() {
+  const select = document.getElementById("filter-mood");
+  if (!select) return;
+  const current = select.value;
+  select.innerHTML = '<option value="all">감정 전체</option>';
+  for (const e of emotionOptions) {
+    const opt = document.createElement("option");
+    opt.value = e.id;
+    opt.textContent = e.label;
+    select.appendChild(opt);
+  }
+  if ([...select.options].some((o) => o.value === current)) select.value = current;
+}
 async function loadAppData() {
   try {
     const [promptsRes, fortuneRes] = await Promise.all([
@@ -143,14 +221,29 @@ async function loadAppData() {
     ]);
     if (promptsRes.ok) {
       const promptsJson = await promptsRes.json();
+      loadEmotionsFromJson(promptsJson);
       promptByMood = buildPromptByMoodFromJson(promptsJson);
+      initPromptRotationKeys();
+      renderEmotionPickers();
+      renderMoodFilter();
     }
-    if (fortuneRes.ok) fortuneData = await fortuneRes.json();
+    if (fortuneRes.ok) {
+      fortuneData = await fortuneRes.json();
+      if (state.fortuneBirthday) refreshFortune();
+    }
   } catch (_error) {
     console.warn("앱 데이터 JSON 로드 실패 — 기본값 사용");
   }
   if (!Object.keys(promptByMood).length) {
     promptByMood = { default: [{ emoji: "✍️", title: "오늘의 한 줄", desc: "오늘 마음을 짧게 남겨보세요.", keywords: [] }] };
+  }
+  if (!emotionOptions.length) {
+    emotionOptions = [
+      { id: "행복", emoji: "😊", label: "행복", chip: "emo-happy" },
+      { id: "평온", emoji: "😌", label: "평온", chip: "emo-calm" },
+    ];
+    renderEmotionPickers();
+    renderMoodFilter();
   }
 }
 function formatTodayLabel() {
@@ -178,20 +271,14 @@ function getMondayWeekDates(reference = new Date()) {
   });
 }
 function moodToEmoji(mood) {
-  if (!mood) return "📝";
-  const text = String(mood).trim();
+  const emotion = getEmotionById(mood);
+  if (emotion) return emotion.emoji;
+  const text = String(mood || "").trim();
   const emoji = text.match(/^[\p{Extended_Pictographic}\u2600-\u27BF]/u);
-  if (emoji) return emoji[0];
-  const map = { 행복: "😊", 평온: "😌", 설렘: "🥰", 차분: "😐", 지침: "😩" };
-  for (const [key, value] of Object.entries(map)) {
-    if (text.includes(key)) return value;
-  }
-  return "📝";
+  return emoji ? emoji[0] : "📝";
 }
 function computeWritingStreak(records) {
-  const dates = new Set(
-    records.map((r) => r.createdAt?.slice(0, 10)).filter(Boolean)
-  );
+  const dates = new Set(records.map(recordDateKey).filter(Boolean));
   if (!dates.size) return 0;
   let streak = 0;
   const cursor = new Date();
@@ -223,7 +310,7 @@ function updateHomeWeekDiary() {
   const labels = ["월", "화", "수", "목", "금", "토", "일"];
   const byDate = {};
   for (const record of state.records) {
-    const key = record.createdAt?.slice(0, 10);
+    const key = recordDateKey(record);
     if (!key) continue;
     if (!byDate[key] || record.createdAt > byDate[key].createdAt) byDate[key] = record;
   }
@@ -237,11 +324,11 @@ function updateHomeWeekDiary() {
     const lbl = dayEl.querySelector(".lbl");
     const dot = dayEl.querySelector(".dot");
     dayEl.classList.toggle("today", isToday);
-    dayEl.classList.toggle("day-add", isToday && !record);
     if (lbl) lbl.textContent = labels[index];
     if (!dot) return;
     dot.classList.remove("dot-add");
     dot.removeAttribute("title");
+    dayEl.classList.remove("day-add");
     if (record) {
       dot.textContent = moodToEmoji(record.mood);
       dot.style.opacity = "1";
@@ -249,6 +336,7 @@ function updateHomeWeekDiary() {
       dot.textContent = "＋";
       dot.style.opacity = "1";
       dot.classList.add("dot-add");
+      dayEl.classList.add("day-add");
       dot.title = "오늘 일기 쓰기";
     } else {
       dot.textContent = "";
@@ -257,9 +345,7 @@ function updateHomeWeekDiary() {
   });
   const weekKeys = new Set(weekDates.map(toDateKey));
   const daysWritten = new Set(
-    state.records
-      .map((r) => r.createdAt?.slice(0, 10))
-      .filter((key) => key && weekKeys.has(key))
+    state.records.map(recordDateKey).filter((key) => key && weekKeys.has(key))
   ).size;
   const streak = computeWritingStreak(state.records);
   if (!summaryEl) return;
@@ -304,15 +390,14 @@ function openManualDiary() {
 function buildDiaryCorpus(records) {
   return records.map((r) => `${r.title} ${r.body} ${r.summary || ""} ${r.mood}`).join(" ").toLowerCase();
 }
-const PROMPT_MOOD_KEYS = ["행복", "평온", "설렘", "차분", "지침"];
-
 function analyzeEmotionsFromRecent(maxEntries = 14) {
   const recent = state.records.slice(0, maxEntries);
+  const moodKeys = getPromptMoodKeys();
   const counts = {};
-  for (const key of PROMPT_MOOD_KEYS) counts[key] = 0;
+  for (const key of moodKeys) counts[key] = 0;
   for (const record of recent) {
-    const mood = record.mood || "";
-    if (PROMPT_MOOD_KEYS.includes(mood)) counts[mood] += 1;
+    const mood = parseMoodLabel(record.mood);
+    if (moodKeys.includes(mood)) counts[mood] += 1;
     else if (mood) counts[mood] = (counts[mood] || 0) + 1;
   }
   const total = recent.length;
@@ -340,7 +425,7 @@ function analyzeEmotionsFromRecent(maxEntries = 14) {
 function calculatePromptScore(prompt, cardMoodKey, analysis) {
   const { distribution, total, dominantMood, corpus } = analysis;
   if (total === 0) return null;
-  const baseKey = PROMPT_MOOD_KEYS.includes(cardMoodKey) ? cardMoodKey : "default";
+  const baseKey = getPromptMoodKeys().includes(cardMoodKey) ? cardMoodKey : "default";
   let score = distribution[baseKey] || 0;
   const keywords = prompt.keywords || [];
   let hits = 0;
@@ -445,6 +530,7 @@ function go(id) {
   replayRevealAnimations(target);
   if (id === "diary") resetOCR();
   if (id === "fortune") {
+    if (fortuneData && state.fortuneBirthday) refreshFortune();
     renderFortuneUI();
     setTimeout(animateGauge, 160);
     if (!state.fortuneBirthday) setTimeout(openSheet, 280);
@@ -509,8 +595,23 @@ function animateGauge() {
   window._gauge = requestAnimationFrame(tick);
 }
 function setStep(step) { document.getElementById("ocr-upload").style.display = step === "upload" ? "block" : "none"; document.getElementById("ocr-loading").style.display = step === "loading" ? "block" : "none"; document.getElementById("ocr-result").style.display = step === "result" ? "block" : "none"; }
-function bindMoodPicker(selector) { const container = document.querySelector(selector); if (!container) return; container.addEventListener("click", (e) => { const option = e.target.closest(".emo-opt"); if (!option) return; container.querySelectorAll(".emo-opt").forEach((x) => x.classList.remove("sel")); option.classList.add("sel"); }); }
-function getSelectedMood(selector) { const selected = document.querySelector(`${selector} .emo-opt.sel`); return selected ? selected.textContent.replace(/^[^\s]+\s*/, "").trim() : "평온"; }
+function bindMoodPicker(selector) {
+  const container = document.querySelector(selector);
+  if (!container || container.dataset.moodBound === "1") return;
+  container.dataset.moodBound = "1";
+  container.addEventListener("click", (e) => {
+    const option = e.target.closest(".emo-opt");
+    if (!option) return;
+    container.querySelectorAll(".emo-opt").forEach((x) => x.classList.remove("sel"));
+    option.classList.add("sel");
+  });
+}
+function getSelectedMood(selector) {
+  const selected = document.querySelector(`${selector} .emo-opt.sel`);
+  if (selected?.dataset.mood) return selected.dataset.mood;
+  if (selected) return parseMoodLabel(selected.textContent);
+  return emotionOptions[0]?.id || "평온";
+}
 
 async function runOCRFile(file) {
   if (!file) return;
@@ -537,7 +638,13 @@ async function saveDiary() {
   const body = document.getElementById("ocr-origin").textContent.trim();
   const summary = document.getElementById("ocr-summary").textContent.replace(/^“|”$/g, "");
   if (!body) return showToast("저장할 OCR 결과가 없어요.");
-  const result = await callWorker("insert", { title, body, summary, mood: getSelectedMood("#emo-pick"), createdAt: new Date().toISOString() });
+  const result = await callWorker("insert", {
+    title,
+    body,
+    summary,
+    mood: formatMoodForSave(getSelectedMood("#emo-pick")),
+    createdAt: new Date().toISOString(),
+  });
   persistSerialized(result); await reloadRecords(); showToast("OCR 일기를 저장했어요."); go("records");
 }
 
@@ -545,7 +652,7 @@ async function saveManualDiary() {
   const title = document.getElementById("manual-title").value.trim() || "제목 없는 기록";
   const body = document.getElementById("manual-body").value.trim();
   if (!body) return showToast("본문을 입력해주세요.");
-  const mood = getSelectedMood("#manual-mood");
+  const mood = formatMoodForSave(getSelectedMood("#manual-mood"));
   let summary = body;
   try { const ai = await apiPost("/api/llm/summarize", { text: body }); summary = ai.summary || summary; } catch (_error) {}
   const result = await callWorker("insert", { title, body, mood, summary, createdAt: new Date().toISOString() });
@@ -607,8 +714,19 @@ function startPromptDiary(card) {
 function createRecordRow(record) {
   const row = document.createElement("div");
   row.className = "diary-row tap";
-  row.innerHTML = `<div class="diary-thumb"><i class="fa-solid fa-pen-nib"></i></div><div style="flex:1;min-width:0"><div style="font-size:14px;font-weight:800">${record.title}</div><div class="muted" style="font-size:12px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${formatDate(record.createdAt)} · ${record.body}</div></div><span class="chip">${record.mood}</span>`;
-  row.addEventListener("click", () => { state.selectedRecordId = record.id; document.getElementById("record-title").textContent = record.title; document.getElementById("record-date").textContent = formatDate(record.createdAt); document.getElementById("record-mood").textContent = record.mood; document.getElementById("record-body").textContent = record.body; document.getElementById("record-summary").textContent = `“${record.summary || record.body.slice(0, 60)}”`; go("record-detail"); });
+  const chipClass = getEmotionChipClass(record.mood);
+  row.innerHTML = `<div class="diary-thumb"><i class="fa-solid fa-pen-nib"></i></div><div style="flex:1;min-width:0"><div style="font-size:14px;font-weight:800">${escapeHtml(record.title)}</div><div class="muted" style="font-size:12px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${formatDate(record.createdAt)} · ${escapeHtml(record.body)}</div></div><span class="chip ${chipClass}">${escapeHtml(record.mood)}</span>`;
+  row.addEventListener("click", () => {
+    state.selectedRecordId = record.id;
+    document.getElementById("record-title").textContent = record.title;
+    document.getElementById("record-date").textContent = formatDate(record.createdAt);
+    const moodEl = document.getElementById("record-mood");
+    moodEl.textContent = record.mood;
+    moodEl.className = `chip ${getEmotionChipClass(record.mood)}`;
+    document.getElementById("record-body").textContent = record.body;
+    document.getElementById("record-summary").textContent = `“${record.summary || record.body.slice(0, 60)}”`;
+    go("record-detail");
+  });
   return row;
 }
 function renderHomeRecords() {
@@ -622,7 +740,7 @@ function renderRecordsPage() {
   const moodFilter = document.getElementById("filter-mood").value;
   const dateFilter = document.getElementById("filter-date").value;
   let rows = [...state.records];
-  if (moodFilter !== "all") rows = rows.filter((r) => r.mood === moodFilter);
+  if (moodFilter !== "all") rows = rows.filter((r) => moodMatchesFilter(r.mood, moodFilter));
   rows.sort((a, b) => (dateFilter === "oldest" ? a.createdAt.localeCompare(b.createdAt) : b.createdAt.localeCompare(a.createdAt)));
   box.innerHTML = "";
   rows.slice(0, 200).forEach((record) => box.appendChild(createRecordRow(record)));
@@ -1085,7 +1203,9 @@ function calculateFortune(birthday, today = new Date()) {
   const totalSeed = fortuneSeed(base, "total");
   const zodiacBoost = fortuneSeed(zodiac, dateKey) % 7;
   const ageBoost = (today.getFullYear() - parsed.year) % 5;
-  const total = Math.max(1, Math.min(100, fortuneScore(totalSeed, 52, 98) + zodiacBoost - 2 + ageBoost));
+  const scoreMin = fortuneData?.totalScore?.min ?? 52;
+  const scoreMax = fortuneData?.totalScore?.max ?? 98;
+  const total = Math.max(1, Math.min(100, fortuneScore(totalSeed, scoreMin, scoreMax) + zodiacBoost - 2 + ageBoost));
   const tier = fortuneTier(total);
   const luckyColors = getLuckyColors();
   const color = fortunePick(luckyColors, fortuneSeed(base, "color"));
@@ -1093,9 +1213,22 @@ function calculateFortune(birthday, today = new Date()) {
   const numB = 10 + (fortuneSeed(base, "numB") % 90);
   const tiers = [...getFortuneTiers()].sort((a, b) => b.min - a.min);
   const totalTier = tiers.find((t) => total >= t.min) || tiers[tiers.length - 1];
-  const loveScore = fortuneScore(fortuneSeed(base, "love"), 50, 99);
-  const moneyScore = fortuneScore(fortuneSeed(base, "money"), 48, 97);
-  const workScore = fortuneScore(fortuneSeed(base, "work"), 52, 99);
+  const catCfg = fortuneData?.categories || {};
+  const loveScore = fortuneScore(
+    fortuneSeed(base, "love"),
+    catCfg.love?.min ?? 50,
+    catCfg.love?.max ?? 99
+  );
+  const moneyScore = fortuneScore(
+    fortuneSeed(base, "money"),
+    catCfg.money?.min ?? 48,
+    catCfg.money?.max ?? 97
+  );
+  const workScore = fortuneScore(
+    fortuneSeed(base, "work"),
+    catCfg.work?.min ?? 52,
+    catCfg.work?.max ?? 99
+  );
   return {
     total,
     tier: { label: totalTier.label, key: String(totalTier.min) },
@@ -1147,7 +1280,21 @@ function setAdviceRow(scoreId, textId, barId, data) {
   textEl.textContent = data.text;
   barEl.style.width = `${data.score}%`;
 }
+function applyFortuneLabelsFromJson() {
+  if (!fortuneData?.categories) return;
+  const pairs = [
+    ["love", "fortune-love-title"],
+    ["money", "fortune-money-title"],
+    ["work", "fortune-work-title"],
+  ];
+  for (const [key, id] of pairs) {
+    const el = document.getElementById(id);
+    const label = fortuneData.categories[key]?.label;
+    if (el && label) el.textContent = label;
+  }
+}
 function renderFortuneUI() {
+  applyFortuneLabelsFromJson();
   const hasFortune = Boolean(state.fortune);
   const f = state.fortune;
   const homePill = document.getElementById("home-fortune-pill");
@@ -1317,7 +1464,7 @@ function bindFindAccountTabs() {
 (async function bootstrap() {
   applyTheme(localStorage.getItem("handam-theme") || "light");
   await loadAppData();
-  bindMoodPicker("#emo-pick"); bindMoodPicker("#manual-mood"); bindSegmentButtons(); bindFindAccountTabs(); bindAdminControls();
+  bindSegmentButtons(); bindFindAccountTabs(); bindAdminControls();
   bindHomeWeekStrip();
   initFortune();
   fillBirthdaySelects();

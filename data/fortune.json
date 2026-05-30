@@ -8,6 +8,8 @@
     { "name": "피치", "hex": "#F5B88A" }
   ],
   "totalScore": {
+    "min": 52,
+    "max": 98,
     "tiers": [
       {
         "min": 90,
@@ -50,6 +52,8 @@
   "categories": {
     "love": {
       "label": "연애운",
+      "min": 50,
+      "max": 99,
       "ranges": [
         {
           "min": 90,
@@ -83,6 +87,8 @@
     },
     "money": {
       "label": "금전운",
+      "min": 48,
+      "max": 97,
       "ranges": [
         {
           "min": 90,
@@ -116,6 +122,8 @@
     },
     "work": {
       "label": "성공운",
+      "min": 52,
+      "max": 99,
       "ranges": [
         {
           "min": 90,

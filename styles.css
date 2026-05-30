@@ -346,6 +346,10 @@ input,textarea,select{font-size:16px}
   font-size:18px;font-weight:800;line-height:1;
   transition:transform .32s var(--ease-spring-bounce),background .2s ease;
 }
+.day.today .dot:not(.dot-add){
+  border-color:var(--accent);
+  box-shadow:0 0 0 3px var(--accent-soft);
+}
 .day.day-add:active .dot.dot-add{transform:scale(.9)}
 .home-greeting-name{
   background:var(--grad-fortune);
@@ -401,10 +405,22 @@ input,textarea,select{font-size:16px}
 .emo-calm{background:#E2EBE0;color:#5C7A56}
 .emo-excited{background:#FADFD9;color:#BC5743}
 .emo-think{background:#DFE6EE;color:#5A7088}
+.emo-tired{background:#E8E4E0;color:#6A6258}
+.emo-grateful{background:#F5E8D0;color:#9A6B22}
+.emo-sad{background:#DFE6F0;color:#4A6080}
+.emo-angry{background:#F8D9D4;color:#A84838}
+.emo-anxious{background:#EDE4F2;color:#6A5088}
+.emo-confident{background:#FBEAD0;color:#B17A22}
 [data-theme="dark"] .emo-happy{background:#3A2F18;color:#E0B45E}
 [data-theme="dark"] .emo-calm{background:#23301F;color:#9EBE92}
 [data-theme="dark"] .emo-excited{background:#3A241E;color:#E08B77}
 [data-theme="dark"] .emo-think{background:#222B36;color:#9DB4CC}
+[data-theme="dark"] .emo-tired{background:#2E2A26;color:#C4BBA8}
+[data-theme="dark"] .emo-grateful{background:#3A3018;color:#E0C070}
+[data-theme="dark"] .emo-sad{background:#222B36;color:#9DB4CC}
+[data-theme="dark"] .emo-angry{background:#3A241E;color:#E08B77}
+[data-theme="dark"] .emo-anxious{background:#2A2436;color:#B8A8D8}
+[data-theme="dark"] .emo-confident{background:#3A2F18;color:#E0B45E}
 
 /* ===== Fortune detail ===== */
 .backbar{display:flex;align-items:center;gap:14px;padding:16px 0 18px}

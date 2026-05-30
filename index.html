@@ -144,7 +144,7 @@
         <div class="advice-row">
           <div class="advice-ic" style="background:#FADFD9;color:#BC5743"><i class="fa-solid fa-heart"></i></div>
           <div style="flex:1">
-            <div style="font-size:14px;font-weight:800">연애운 <span class="muted" style="font-weight:700" id="fortune-love-score">· —</span></div>
+            <div style="font-size:14px;font-weight:800"><span id="fortune-love-title">연애운</span> <span class="muted" style="font-weight:700" id="fortune-love-score">· —</span></div>
             <div class="muted" style="font-size:12px;font-weight:600" id="fortune-love-text">생일을 입력하면 분야별 운세를 볼 수 있어요.</div>
             <div class="bar"><i id="fortune-love-bar" style="width:0%"></i></div>
           </div>
@@ -152,7 +152,7 @@
         <div class="advice-row">
           <div class="advice-ic" style="background:#FBEAD0;color:#B17A22"><i class="fa-solid fa-coins"></i></div>
           <div style="flex:1">
-            <div style="font-size:14px;font-weight:800">금전운 <span class="muted" style="font-weight:700" id="fortune-money-score">· —</span></div>
+            <div style="font-size:14px;font-weight:800"><span id="fortune-money-title">금전운</span> <span class="muted" style="font-weight:700" id="fortune-money-score">· —</span></div>
             <div class="muted" style="font-size:12px;font-weight:600" id="fortune-money-text">생일을 입력하면 분야별 운세를 볼 수 있어요.</div>
             <div class="bar"><i id="fortune-money-bar" style="width:0%"></i></div>
           </div>
@@ -160,7 +160,7 @@
         <div class="advice-row">
           <div class="advice-ic" style="background:#E2EBE0;color:#5C7A56"><i class="fa-solid fa-briefcase"></i></div>
           <div style="flex:1">
-            <div style="font-size:14px;font-weight:800">성공운 <span class="muted" style="font-weight:700" id="fortune-work-score">· —</span></div>
+            <div style="font-size:14px;font-weight:800"><span id="fortune-work-title">성공운</span> <span class="muted" style="font-weight:700" id="fortune-work-score">· —</span></div>
             <div class="muted" style="font-size:12px;font-weight:600" id="fortune-work-text">생일을 입력하면 분야별 운세를 볼 수 있어요.</div>
             <div class="bar"><i id="fortune-work-bar" style="width:0%"></i></div>
           </div>
@@ -243,13 +243,7 @@
         <div class="reveal" style="--d:.15s;margin:20px 4px 10px">
           <span class="h-sec">오늘의 감정은 어땠나요?</span>
         </div>
-        <div class="emo-pick reveal" style="--d:.18s" id="emo-pick">
-          <div class="emo-opt sel">😊 행복</div>
-          <div class="emo-opt">😌 평온</div>
-          <div class="emo-opt">🥰 설렘</div>
-          <div class="emo-opt">😐 차분</div>
-          <div class="emo-opt">😔 지침</div>
-        </div>
+        <div class="emo-pick reveal" style="--d:.18s" id="emo-pick"></div>
         <div class="reveal" style="--d:.22s;display:flex;gap:10px;margin-top:22px">
           <button class="btn btn-line" style="flex:0 0 40%" onclick="resetOCR()">다시 찍기</button>
           <button class="btn btn-primary" onclick="saveDiary()"><i class="fa-solid fa-bookmark"></i> 저장하기</button>
@@ -394,11 +388,6 @@
       <div class="card reveal" style="--d:.06s;padding:16px;display:flex;gap:10px">
         <select class="field" id="filter-mood">
           <option value="all">감정 전체</option>
-          <option value="행복">행복</option>
-          <option value="평온">평온</option>
-          <option value="설렘">설렘</option>
-          <option value="차분">차분</option>
-          <option value="지침">지침</option>
         </select>
         <select class="field" id="filter-date">
           <option value="latest">최신순</option>
@@ -451,12 +440,7 @@
         <label class="field-label" style="margin-top:14px">본문</label>
         <textarea class="textarea" id="manual-body" placeholder="오늘은 평소보다 천천히 걸었다. 익숙한 길에서도 새로운 간판과 나무 그림자가 눈에 들어왔다." autocomplete="off"></textarea>
         <label class="field-label" style="margin-top:14px">감정</label>
-        <div class="emo-pick" id="manual-mood">
-          <div class="emo-opt sel">😊 행복</div>
-          <div class="emo-opt">😌 평온</div>
-          <div class="emo-opt">🥰 설렘</div>
-          <div class="emo-opt">😐 차분</div>
-        </div>
+        <div class="emo-pick" id="manual-mood"></div>
       </div>
       <button class="btn btn-primary reveal" style="--d:.12s;margin-top:16px" onclick="saveManualDiary()">
         <i class="fa-solid fa-bookmark"></i> 직접 입력 저장하기
