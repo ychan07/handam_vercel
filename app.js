@@ -1,5 +1,6 @@
 ﻿import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { getAnalytics, isSupported as analyticsSupported } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-analytics.js";
+import { initInteractions, refreshInteractions } from "./interactions.js";
 import {
   getAuth,
   onAuthStateChanged,
@@ -315,14 +316,26 @@ function applyTheme(t) { document.documentElement.setAttribute("data-theme", t);
 function toggleTheme(event) { if (event) event.stopPropagation(); const cur = document.documentElement.getAttribute("data-theme"); applyTheme(cur === "dark" ? "light" : "dark"); }
 function toggleSwitch(event, element, message) { if (event) event.stopPropagation(); element.classList.toggle("on"); if (message) showToast(message); }
 function showToast(message) { const toast = document.getElementById("toast"); toast.textContent = message; toast.classList.add("show"); clearTimeout(window._toastTimer); window._toastTimer = setTimeout(() => toast.classList.remove("show"), 1900); }
-function openSheet() { document.getElementById("scrim").classList.add("show"); document.getElementById("sheet").classList.add("show"); }
-function closeSheet() { document.getElementById("scrim").classList.remove("show"); document.getElementById("sheet").classList.remove("show"); }
+function openSheet() {
+  const scrim = document.getElementById("scrim");
+  const sheet = document.getElementById("sheet");
+  scrim.classList.add("show");
+  sheet.classList.add("show");
+  requestAnimationFrame(() => sheet.classList.add("sheet-entered"));
+}
+function closeSheet() {
+  const scrim = document.getElementById("scrim");
+  const sheet = document.getElementById("sheet");
+  sheet.classList.remove("sheet-entered");
+  scrim.classList.remove("show");
+  sheet.classList.remove("show");
+}
 function animateGauge() {
   const ring = document.getElementById("gauge-ring");
   const num = document.getElementById("gauge-num");
   if (!ring || !num) return;
   const C = 515.2;
-  clearInterval(window._gauge);
+  if (window._gauge) cancelAnimationFrame(window._gauge);
   if (!state.fortune) {
     ring.style.transition = "none";
     ring.style.strokeDashoffset = C;
@@ -333,17 +346,21 @@ function animateGauge() {
   ring.style.transition = "none";
   ring.style.strokeDashoffset = C;
   ring.getBoundingClientRect();
-  ring.style.transition = "stroke-dashoffset 1.4s cubic-bezier(.2,.8,.2,1)";
+  ring.style.transition = "stroke-dashoffset 1.55s cubic-bezier(.22,1,.36,1)";
   ring.style.strokeDashoffset = C * (1 - target / 100);
   let v = 0;
-  window._gauge = setInterval(() => {
-    v += 2;
+  const tick = () => {
+    const remaining = target - v;
+    v += Math.max(1, Math.ceil(remaining * 0.08));
     if (v >= target) {
       v = target;
-      clearInterval(window._gauge);
+      num.textContent = String(v);
+      return;
     }
     num.textContent = String(v);
-  }, 24);
+    window._gauge = requestAnimationFrame(tick);
+  };
+  window._gauge = requestAnimationFrame(tick);
 }
 function setStep(step) { document.getElementById("ocr-upload").style.display = step === "upload" ? "block" : "none"; document.getElementById("ocr-loading").style.display = step === "loading" ? "block" : "none"; document.getElementById("ocr-result").style.display = step === "result" ? "block" : "none"; }
 function bindMoodPicker(selector) { const container = document.querySelector(selector); if (!container) return; container.addEventListener("click", (e) => { const option = e.target.closest(".emo-opt"); if (!option) return; container.querySelectorAll(".emo-opt").forEach((x) => x.classList.remove("sel")); option.classList.add("sel"); }); }
@@ -439,8 +456,23 @@ function createRecordRow(record) {
   row.addEventListener("click", () => { state.selectedRecordId = record.id; document.getElementById("record-title").textContent = record.title; document.getElementById("record-date").textContent = formatDate(record.createdAt); document.getElementById("record-mood").textContent = record.mood; document.getElementById("record-body").textContent = record.body; document.getElementById("record-summary").textContent = `“${record.summary || record.body.slice(0, 60)}”`; go("record-detail"); });
   return row;
 }
-function renderHomeRecords() { const box = document.getElementById("home-record-list"); box.innerHTML = ""; state.records.slice(0, 3).forEach((record) => box.appendChild(createRecordRow(record))); }
-function renderRecordsPage() { const box = document.getElementById("records-list"); const moodFilter = document.getElementById("filter-mood").value; const dateFilter = document.getElementById("filter-date").value; let rows = [...state.records]; if (moodFilter !== "all") rows = rows.filter((r) => r.mood === moodFilter); rows.sort((a, b) => dateFilter === "oldest" ? a.createdAt.localeCompare(b.createdAt) : b.createdAt.localeCompare(a.createdAt)); box.innerHTML = ""; rows.slice(0, 200).forEach((record) => box.appendChild(createRecordRow(record))); }
+function renderHomeRecords() {
+  const box = document.getElementById("home-record-list");
+  box.innerHTML = "";
+  state.records.slice(0, 3).forEach((record) => box.appendChild(createRecordRow(record)));
+  refreshInteractions();
+}
+function renderRecordsPage() {
+  const box = document.getElementById("records-list");
+  const moodFilter = document.getElementById("filter-mood").value;
+  const dateFilter = document.getElementById("filter-date").value;
+  let rows = [...state.records];
+  if (moodFilter !== "all") rows = rows.filter((r) => r.mood === moodFilter);
+  rows.sort((a, b) => (dateFilter === "oldest" ? a.createdAt.localeCompare(b.createdAt) : b.createdAt.localeCompare(a.createdAt)));
+  box.innerHTML = "";
+  rows.slice(0, 200).forEach((record) => box.appendChild(createRecordRow(record)));
+  refreshInteractions();
+}
 async function reloadRecords() { state.records = await callWorker("list"); renderHomeRecords(); renderRecordsPage(); renderPromptRecommendations(); }
 async function deleteCurrentRecord() { if (!state.selectedRecordId) return; const result = await callWorker("delete", { id: state.selectedRecordId }); persistSerialized(result); state.selectedRecordId = null; await reloadRecords(); showToast("기록을 삭제했어요."); go("records"); }
 
@@ -1123,6 +1155,7 @@ function bindFindAccountTabs() {
   bindMoodPicker("#emo-pick"); bindMoodPicker("#manual-mood"); bindSegmentButtons(); bindFindAccountTabs(); bindAdminControls();
   initFortune();
   fillBirthdaySelects();
+  initInteractions();
   document.getElementById("ocr-camera-file").addEventListener("change", (e) => runOCRFile(e.target.files?.[0]));
   document.getElementById("ocr-gallery-file").addEventListener("change", (e) => runOCRFile(e.target.files?.[0]));
   document.getElementById("filter-mood").addEventListener("change", renderRecordsPage);
