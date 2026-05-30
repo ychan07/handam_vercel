@@ -57,14 +57,14 @@
       <div class="card fortune-hero tap reveal" style="--d:.12s;margin-top:14px" onclick="go('fortune')">
         <div style="display:flex;justify-content:space-between;align-items:center">
           <span class="eyebrow">오늘의 운세</span>
-          <span class="score-pill"><i class="fa-solid fa-star"></i> 95점</span>
+          <span class="score-pill" id="home-fortune-pill"><i class="fa-solid fa-cake-candles"></i> 생일을 입력해보세요</span>
         </div>
-        <p class="serif" style="font-size:19px;font-weight:700;line-height:1.6;margin-top:12px">
-          “말하는 대로 이루어지는<br>마법 같은 하루입니다.”
+        <p class="serif" id="home-fortune-quote" style="font-size:19px;font-weight:700;line-height:1.6;margin-top:12px">
+          생년월일을 입력하면<br>오늘의 운세 점수를 알려드려요.
         </p>
-        <div style="display:flex;align-items:center;gap:8px;margin-top:16px;font-size:13px;font-weight:700">
-          <span class="swatch" style="background:#7FB7D9"></span>
-          행운의 색 · 스카이 블루
+        <div id="home-fortune-lucky" style="display:flex;align-items:center;gap:8px;margin-top:16px;font-size:13px;font-weight:700">
+          <span class="swatch" id="home-fortune-swatch" style="background:#7FB7D9"></span>
+          <span id="home-fortune-lucky-text">운세 페이지에서 생일을 입력해 주세요</span>
           <i class="fa-solid fa-chevron-right" style="margin-left:auto;font-size:12px;opacity:.8"></i>
         </div>
       </div>
@@ -109,28 +109,32 @@
                       stroke-dasharray="515.2" stroke-dashoffset="515.2"/>
             </svg>
             <div class="gauge-center">
-              <span class="gauge-num" id="gauge-num">0</span>
-              <span style="font-size:12px;font-weight:800;letter-spacing:.05em;opacity:.85">총운 · 매우 좋음</span>
+              <span class="gauge-num" id="gauge-num">—</span>
+              <span id="gauge-label" style="font-size:12px;font-weight:800;letter-spacing:.05em;opacity:.85">생일을 입력해 주세요</span>
             </div>
           </div>
-          <p class="serif" style="text-align:center;font-size:15px;line-height:1.75;margin-top:6px;opacity:.95">
-            평소 미뤄왔던 고백이나 제안이 있다면,<br>망설임 없이 오늘 꺼내 보세요.
+          <p class="serif" id="fortune-quote" style="text-align:center;font-size:15px;line-height:1.75;margin-top:6px;opacity:.95">
+            생년월일과 별자리를 바탕으로<br>오늘의 운세를 계산해 드려요.
           </p>
         </div>
       </div>
 
       <!-- Lucky -->
-      <div class="lucky-grid reveal" style="--d:.11s;margin-top:14px">
+      <div class="lucky-grid reveal" style="--d:.11s;margin-top:14px" id="fortune-lucky-grid">
+        <div class="card" style="padding:18px">
+          <div class="muted" style="font-size:12px;font-weight:800;margin-bottom:8px">별자리</div>
+          <div style="font-size:15px;font-weight:800" id="fortune-zodiac">—</div>
+        </div>
         <div class="card" style="padding:18px">
           <div class="muted" style="font-size:12px;font-weight:800;margin-bottom:8px">행운의 색</div>
           <div style="display:flex;align-items:center;gap:9px">
-            <span class="swatch" style="background:#7FB7D9;border-color:var(--border)"></span>
-            <span style="font-size:15px;font-weight:800">스카이 블루</span>
+            <span class="swatch" id="fortune-lucky-swatch" style="background:#7FB7D9;border-color:var(--border)"></span>
+            <span style="font-size:15px;font-weight:800" id="fortune-lucky-color">—</span>
           </div>
         </div>
         <div class="card" style="padding:18px">
           <div class="muted" style="font-size:12px;font-weight:800;margin-bottom:8px">행운의 숫자</div>
-          <div style="font-size:15px;font-weight:800">7 · 24</div>
+          <div style="font-size:15px;font-weight:800" id="fortune-lucky-numbers">—</div>
         </div>
       </div>
 
@@ -140,34 +144,34 @@
         <div class="advice-row">
           <div class="advice-ic" style="background:#FADFD9;color:#BC5743"><i class="fa-solid fa-heart"></i></div>
           <div style="flex:1">
-            <div style="font-size:14px;font-weight:800">연애운 <span class="muted" style="font-weight:700">· 92</span></div>
-            <div class="muted" style="font-size:12px;font-weight:600">대화가 물 흐르듯 자연스럽게 풀립니다.</div>
-            <div class="bar"><i style="width:92%"></i></div>
+            <div style="font-size:14px;font-weight:800">연애운 <span class="muted" style="font-weight:700" id="fortune-love-score">· —</span></div>
+            <div class="muted" style="font-size:12px;font-weight:600" id="fortune-love-text">생일을 입력하면 분야별 운세를 볼 수 있어요.</div>
+            <div class="bar"><i id="fortune-love-bar" style="width:0%"></i></div>
           </div>
         </div>
         <div class="advice-row">
           <div class="advice-ic" style="background:#FBEAD0;color:#B17A22"><i class="fa-solid fa-coins"></i></div>
           <div style="flex:1">
-            <div style="font-size:14px;font-weight:800">금전운 <span class="muted" style="font-weight:700">· 78</span></div>
-            <div class="muted" style="font-size:12px;font-weight:600">작은 횡재수, 주변을 잘 살펴보세요.</div>
-            <div class="bar"><i style="width:78%"></i></div>
+            <div style="font-size:14px;font-weight:800">금전운 <span class="muted" style="font-weight:700" id="fortune-money-score">· —</span></div>
+            <div class="muted" style="font-size:12px;font-weight:600" id="fortune-money-text">생일을 입력하면 분야별 운세를 볼 수 있어요.</div>
+            <div class="bar"><i id="fortune-money-bar" style="width:0%"></i></div>
           </div>
         </div>
         <div class="advice-row">
           <div class="advice-ic" style="background:#E2EBE0;color:#5C7A56"><i class="fa-solid fa-briefcase"></i></div>
           <div style="flex:1">
-            <div style="font-size:14px;font-weight:800">성공운 <span class="muted" style="font-weight:700">· 96</span></div>
-            <div class="muted" style="font-size:12px;font-weight:600">집중력이 최고조, 능률이 크게 오릅니다.</div>
-            <div class="bar"><i style="width:96%"></i></div>
+            <div style="font-size:14px;font-weight:800">성공운 <span class="muted" style="font-weight:700" id="fortune-work-score">· —</span></div>
+            <div class="muted" style="font-size:12px;font-weight:600" id="fortune-work-text">생일을 입력하면 분야별 운세를 볼 수 있어요.</div>
+            <div class="bar"><i id="fortune-work-bar" style="width:0%"></i></div>
           </div>
         </div>
       </div>
 
-      <button class="btn btn-line reveal" style="--d:.24s;margin-top:16px" onclick="openSheet()">
-        <i class="fa-solid fa-cake-candles"></i> 생일 정보로 더 정확하게 보기
+      <button class="btn btn-line reveal" style="--d:.24s;margin-top:16px" id="fortune-birthday-btn" onclick="openSheet()">
+        <i class="fa-solid fa-cake-candles"></i> 생년월일 입력하기
       </button>
       <p class="muted reveal" style="--d:.27s;font-size:11px;text-align:center;margin-top:10px;font-weight:600">
-        un7.kr 운세 API 연동 · 매일 0시 갱신
+        생년월일·별자리 기반 계산 · 매일 0시 갱신
       </p>
     </div>
   </div>
@@ -700,7 +704,7 @@
     <div class="grabber"></div>
     <h2 style="font-size:18px;font-weight:800">생년월일 입력</h2>
     <p class="muted" style="font-size:13px;font-weight:600;margin-top:6px">
-      사주 기반으로 더 정확한 운세를 알려드려요.
+      생년월일과 별자리로 오늘의 운세 점수를 계산해요.
     </p>
     <div style="display:flex;gap:9px;margin-top:18px">
       <select class="field" id="fortune-year"></select>
@@ -711,7 +715,7 @@
       <div class="lead" style="font-size:13px"><i class="fa-solid fa-moon"></i> 음력으로 입력</div>
       <div class="switch" onclick="toggleSwitch(event, this, '음력 입력 설정을 바꿨어요')"></div>
     </div>
-    <button class="btn btn-primary" style="margin-top:16px" onclick="updateFortuneFromBirthday()">운세 다시 보기</button>
+    <button class="btn btn-primary" style="margin-top:16px" onclick="updateFortuneFromBirthday()">운세 계산하기</button>
   </div>
 
   <div class="toast" id="toast"></div>

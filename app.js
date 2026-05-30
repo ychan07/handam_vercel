@@ -40,7 +40,8 @@ const state = {
   auth: null,
   profile: null,
   admin: null,
-  fortuneScore: 95,
+  fortuneBirthday: null,
+  fortune: null,
   selectedPrompt: "",
   adminUsers: [],
 };
@@ -297,10 +298,17 @@ function go(id) {
   target.scrollTop = 0;
   replayRevealAnimations(target);
   if (id === "diary") resetOCR();
-  if (id === "fortune") setTimeout(animateGauge, 160);
+  if (id === "fortune") {
+    renderFortuneUI();
+    setTimeout(animateGauge, 160);
+    if (!state.fortuneBirthday) setTimeout(openSheet, 280);
+  }
   if (id === "records") renderRecordsPage();
   if (id === "prompts") renderPromptRecommendations();
-  if (id === "home" || id === "settings") updateUserUI();
+  if (id === "home" || id === "settings") {
+    updateUserUI();
+    renderFortuneUI();
+  }
   if (id === "admin") loadAdminDashboard();
 }
 function applyTheme(t) { document.documentElement.setAttribute("data-theme", t); document.getElementById("theme-btn").innerHTML = t === "dark" ? '<i class="fa-solid fa-sun"></i>' : '<i class="fa-solid fa-moon"></i>'; const darkSwitch = document.getElementById("dark-switch"); if (darkSwitch) darkSwitch.classList.toggle("on", t === "dark"); localStorage.setItem("handam-theme", t); }
@@ -309,7 +317,34 @@ function toggleSwitch(event, element, message) { if (event) event.stopPropagatio
 function showToast(message) { const toast = document.getElementById("toast"); toast.textContent = message; toast.classList.add("show"); clearTimeout(window._toastTimer); window._toastTimer = setTimeout(() => toast.classList.remove("show"), 1900); }
 function openSheet() { document.getElementById("scrim").classList.add("show"); document.getElementById("sheet").classList.add("show"); }
 function closeSheet() { document.getElementById("scrim").classList.remove("show"); document.getElementById("sheet").classList.remove("show"); }
-function animateGauge() { const ring = document.getElementById("gauge-ring"), num = document.getElementById("gauge-num"), C = 515.2, target = state.fortuneScore || 95; ring.style.transition = "none"; ring.style.strokeDashoffset = C; ring.getBoundingClientRect(); ring.style.transition = "stroke-dashoffset 1.4s cubic-bezier(.2,.8,.2,1)"; ring.style.strokeDashoffset = C * (1 - target / 100); let v = 0; clearInterval(window._gauge); window._gauge = setInterval(() => { v += 2; if (v >= target) { v = target; clearInterval(window._gauge); } num.textContent = String(v); }, 24); }
+function animateGauge() {
+  const ring = document.getElementById("gauge-ring");
+  const num = document.getElementById("gauge-num");
+  if (!ring || !num) return;
+  const C = 515.2;
+  clearInterval(window._gauge);
+  if (!state.fortune) {
+    ring.style.transition = "none";
+    ring.style.strokeDashoffset = C;
+    num.textContent = "—";
+    return;
+  }
+  const target = state.fortune.total;
+  ring.style.transition = "none";
+  ring.style.strokeDashoffset = C;
+  ring.getBoundingClientRect();
+  ring.style.transition = "stroke-dashoffset 1.4s cubic-bezier(.2,.8,.2,1)";
+  ring.style.strokeDashoffset = C * (1 - target / 100);
+  let v = 0;
+  window._gauge = setInterval(() => {
+    v += 2;
+    if (v >= target) {
+      v = target;
+      clearInterval(window._gauge);
+    }
+    num.textContent = String(v);
+  }, 24);
+}
 function setStep(step) { document.getElementById("ocr-upload").style.display = step === "upload" ? "block" : "none"; document.getElementById("ocr-loading").style.display = step === "loading" ? "block" : "none"; document.getElementById("ocr-result").style.display = step === "result" ? "block" : "none"; }
 function bindMoodPicker(selector) { const container = document.querySelector(selector); if (!container) return; container.addEventListener("click", (e) => { const option = e.target.closest(".emo-opt"); if (!option) return; container.querySelectorAll(".emo-opt").forEach((x) => x.classList.remove("sel")); option.classList.add("sel"); }); }
 function getSelectedMood(selector) { const selected = document.querySelector(`${selector} .emo-opt.sel`); return selected ? selected.textContent.replace(/^[^\s]+\s*/, "").trim() : "평온"; }
@@ -765,17 +800,283 @@ async function exportDiaries() {
   showToast("일기 JSON 내보내기를 완료했어요.");
 }
 
-function fillBirthdaySelects() {
-  const y = document.getElementById("fortune-year"), m = document.getElementById("fortune-month"), d = document.getElementById("fortune-day");
-  const now = new Date(); const currentYear = now.getFullYear();
-  for (let year = currentYear; year >= 1950; year -= 1) { const opt = document.createElement("option"); opt.value = String(year); opt.textContent = String(year); if (year === 1996) opt.selected = true; y.appendChild(opt); }
-  for (let month = 1; month <= 12; month += 1) { const opt = document.createElement("option"); opt.value = String(month).padStart(2, "0"); opt.textContent = `${month}월`; if (month === 5) opt.selected = true; m.appendChild(opt); }
-  for (let day = 1; day <= 31; day += 1) { const opt = document.createElement("option"); opt.value = String(day).padStart(2, "0"); opt.textContent = `${day}일`; if (day === 20) opt.selected = true; d.appendChild(opt); }
+const FORTUNE_BIRTHDAY_KEY = "handam-fortune-birthday";
+const LUCKY_COLORS = [
+  { name: "스카이 블루", hex: "#7FB7D9" },
+  { name: "코랄 핑크", hex: "#F4A5A0" },
+  { name: "민트 그린", hex: "#8BC9A8" },
+  { name: "라벤더", hex: "#B8A9E8" },
+  { name: "선샤인 옐로", hex: "#F2D06B" },
+  { name: "피치", hex: "#F5B88A" },
+];
+const FORTUNE_QUOTES = {
+  high: [
+    "말하는 대로 이루어지는<br>마법 같은 하루입니다.",
+    "작은 용기가 큰 기회로<br>이어지는 날이에요.",
+    "주변의 응원이 당신에게<br>큰 힘이 됩니다.",
+  ],
+  mid: [
+    "차분히 한 걸음씩 나아가면<br>분명 좋은 흐름이 와요.",
+    "오늘은 준비와 정리에<br>집중하기 좋은 날입니다.",
+    "무리하지 않아도<br>충분히 잘 해낼 수 있어요.",
+  ],
+  low: [
+    "잠시 쉬어가도 괜찮아요.<br>내일은 더 가벼워집니다.",
+    "조급함보다 차분함이<br>오늘의 열쇠입니다.",
+    "작은 실수는 지나가고,<br>배움만 남는 하루예요.",
+  ],
+};
+const FORTUNE_ADVICE = {
+  love: [
+    "대화가 물 흐르듯 자연스럽게 풀립니다.",
+    "진심을 전하면 좋은 반응을 받을 수 있어요.",
+    "상대의 말에 귀 기울이면 관계가 깊어집니다.",
+  ],
+  money: [
+    "작은 횡재수, 주변을 잘 살펴보세요.",
+    "계획적인 소비가 오늘의 행운을 키워요.",
+    "예상치 못한 이득보다 꾸준함이 유리합니다.",
+  ],
+  work: [
+    "집중력이 최고조, 능률이 크게 오릅니다.",
+    "미뤄둔 일을 처리하기 좋은 타이밍이에요.",
+    "협업에서 당신의 역할이 빛날 수 있습니다.",
+  ],
+};
+
+function fortuneHash(input) {
+  let h = 2166136261;
+  for (let i = 0; i < input.length; i += 1) {
+    h ^= input.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return Math.abs(h >>> 0);
 }
-async function updateFortuneFromBirthday() {
+function fortuneSeed(base, salt) {
+  return fortuneHash(`${base}|${salt}`);
+}
+function fortunePick(list, seed) {
+  return list[seed % list.length];
+}
+function fortuneScore(seed, min = 55, max = 99) {
+  return min + (seed % (max - min + 1));
+}
+function formatDateKey(date) {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+function parseBirthday(birthday) {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(birthday || "").trim());
+  if (!match) return null;
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  const date = new Date(year, month - 1, day);
+  if (date.getFullYear() !== year || date.getMonth() !== month - 1 || date.getDate() !== day) return null;
+  return { year, month, day };
+}
+function getWesternZodiac(month, day) {
+  const md = month * 100 + day;
+  if (md >= 321 && md <= 419) return "양자리";
+  if (md >= 420 && md <= 520) return "황소자리";
+  if (md >= 521 && md <= 620) return "쌍둥이자리";
+  if (md >= 621 && md <= 722) return "게자리";
+  if (md >= 723 && md <= 822) return "사자자리";
+  if (md >= 823 && md <= 922) return "처녀자리";
+  if (md >= 923 && md <= 1022) return "천칭자리";
+  if (md >= 1023 && md <= 1121) return "전갈자리";
+  if (md >= 1122 && md <= 1221) return "사수자리";
+  if (md >= 1222 || md <= 119) return "염소자리";
+  if (md >= 120 && md <= 218) return "물병자리";
+  return "물고기자리";
+}
+function getChineseZodiac(year) {
+  const animals = ["원숭이", "닭", "개", "돼지", "쥐", "소", "호랑이", "토끼", "용", "뱀", "말", "양"];
+  return `${animals[((year % 12) + 12) % 12]}띠`;
+}
+function fortuneTier(score) {
+  if (score >= 90) return { label: "매우 좋음", key: "high" };
+  if (score >= 75) return { label: "좋음", key: "high" };
+  if (score >= 60) return { label: "보통", key: "mid" };
+  return { label: "주의", key: "low" };
+}
+function calculateFortune(birthday, today = new Date()) {
+  const parsed = parseBirthday(birthday);
+  if (!parsed) return null;
+  const dateKey = formatDateKey(today);
+  const zodiac = getWesternZodiac(parsed.month, parsed.day);
+  const chinese = getChineseZodiac(parsed.year);
+  const base = `${birthday}|${dateKey}|${zodiac}|${chinese}`;
+  const totalSeed = fortuneSeed(base, "total");
+  const zodiacBoost = fortuneSeed(zodiac, dateKey) % 7;
+  const ageBoost = (today.getFullYear() - parsed.year) % 5;
+  const total = Math.max(1, Math.min(100, fortuneScore(totalSeed, 52, 98) + zodiacBoost - 2 + ageBoost));
+  const tier = fortuneTier(total);
+  const color = fortunePick(LUCKY_COLORS, fortuneSeed(base, "color"));
+  const numA = 1 + (fortuneSeed(base, "numA") % 9);
+  const numB = 10 + (fortuneSeed(base, "numB") % 90);
+  return {
+    total,
+    tier,
+    zodiac,
+    chinese,
+    color,
+    numbers: [numA, numB],
+    quote: fortunePick(FORTUNE_QUOTES[tier.key], fortuneSeed(base, "quote")),
+    love: {
+      score: fortuneScore(fortuneSeed(base, "love"), 50, 99),
+      text: fortunePick(FORTUNE_ADVICE.love, fortuneSeed(base, "loveText")),
+    },
+    money: {
+      score: fortuneScore(fortuneSeed(base, "money"), 48, 97),
+      text: fortunePick(FORTUNE_ADVICE.money, fortuneSeed(base, "moneyText")),
+    },
+    work: {
+      score: fortuneScore(fortuneSeed(base, "work"), 52, 99),
+      text: fortunePick(FORTUNE_ADVICE.work, fortuneSeed(base, "workText")),
+    },
+  };
+}
+function loadFortuneBirthday() {
+  try { return localStorage.getItem(FORTUNE_BIRTHDAY_KEY) || null; } catch (_e) { return null; }
+}
+function saveFortuneBirthday(birthday) {
+  localStorage.setItem(FORTUNE_BIRTHDAY_KEY, birthday);
+  state.fortuneBirthday = birthday;
+}
+function refreshFortune() {
+  if (!state.fortuneBirthday) {
+    state.fortune = null;
+    return;
+  }
+  state.fortune = calculateFortune(state.fortuneBirthday);
+}
+function setAdviceRow(scoreId, textId, barId, data) {
+  const scoreEl = document.getElementById(scoreId);
+  const textEl = document.getElementById(textId);
+  const barEl = document.getElementById(barId);
+  if (!scoreEl || !textEl || !barEl) return;
+  if (!data) {
+    scoreEl.textContent = "· —";
+    textEl.textContent = "생일을 입력하면 분야별 운세를 볼 수 있어요.";
+    barEl.style.width = "0%";
+    return;
+  }
+  scoreEl.textContent = `· ${data.score}`;
+  textEl.textContent = data.text;
+  barEl.style.width = `${data.score}%`;
+}
+function renderFortuneUI() {
+  const hasFortune = Boolean(state.fortune);
+  const f = state.fortune;
+  const homePill = document.getElementById("home-fortune-pill");
+  const homeQuote = document.getElementById("home-fortune-quote");
+  const homeLuckyText = document.getElementById("home-fortune-lucky-text");
+  const homeSwatch = document.getElementById("home-fortune-swatch");
+  if (homePill) {
+    homePill.innerHTML = hasFortune
+      ? `<i class="fa-solid fa-star"></i> ${f.total}점`
+      : `<i class="fa-solid fa-cake-candles"></i> 생일을 입력해보세요`;
+  }
+  if (homeQuote) {
+    homeQuote.innerHTML = hasFortune
+      ? `“${f.quote.replace(/<br>/g, " ")}”`
+      : "생년월일을 입력하면<br>오늘의 운세 점수를 알려드려요.";
+  }
+  if (homeLuckyText && homeSwatch) {
+    if (hasFortune) {
+      homeSwatch.style.background = f.color.hex;
+      homeLuckyText.textContent = `행운의 색 · ${f.color.name}`;
+    } else {
+      homeSwatch.style.background = "#7FB7D9";
+      homeLuckyText.textContent = "운세 페이지에서 생일을 입력해 주세요";
+    }
+  }
+  const gaugeLabel = document.getElementById("gauge-label");
+  const fortuneQuote = document.getElementById("fortune-quote");
+  const gaugeNum = document.getElementById("gauge-num");
+  if (gaugeLabel) gaugeLabel.textContent = hasFortune ? `총운 · ${f.tier.label}` : "생일을 입력해 주세요";
+  if (fortuneQuote) {
+    fortuneQuote.innerHTML = hasFortune
+      ? f.quote
+      : "생년월일과 별자리를 바탕으로<br>오늘의 운세를 계산해 드려요.";
+  }
+  if (gaugeNum && !hasFortune) gaugeNum.textContent = "—";
+  const zodiacEl = document.getElementById("fortune-zodiac");
+  const colorEl = document.getElementById("fortune-lucky-color");
+  const swatchEl = document.getElementById("fortune-lucky-swatch");
+  const numbersEl = document.getElementById("fortune-lucky-numbers");
+  if (zodiacEl) zodiacEl.textContent = hasFortune ? `${f.zodiac} · ${f.chinese}` : "—";
+  if (colorEl) colorEl.textContent = hasFortune ? f.color.name : "—";
+  if (swatchEl) swatchEl.style.background = hasFortune ? f.color.hex : "#7FB7D9";
+  if (numbersEl) numbersEl.textContent = hasFortune ? `${f.numbers[0]} · ${f.numbers[1]}` : "—";
+  setAdviceRow("fortune-love-score", "fortune-love-text", "fortune-love-bar", hasFortune ? f.love : null);
+  setAdviceRow("fortune-money-score", "fortune-money-text", "fortune-money-bar", hasFortune ? f.money : null);
+  setAdviceRow("fortune-work-score", "fortune-work-text", "fortune-work-bar", hasFortune ? f.work : null);
+  const birthdayBtn = document.getElementById("fortune-birthday-btn");
+  if (birthdayBtn) {
+    birthdayBtn.innerHTML = hasFortune
+      ? '<i class="fa-solid fa-cake-candles"></i> 생년월일 다시 입력하기'
+      : '<i class="fa-solid fa-cake-candles"></i> 생년월일 입력하기';
+  }
+}
+function fillBirthdaySelects() {
+  const y = document.getElementById("fortune-year");
+  const m = document.getElementById("fortune-month");
+  const d = document.getElementById("fortune-day");
+  if (!y || !m || !d) return;
+  const saved = parseBirthday(state.fortuneBirthday);
+  const now = new Date();
+  const currentYear = now.getFullYear();
+  y.innerHTML = "";
+  m.innerHTML = "";
+  d.innerHTML = "";
+  for (let year = currentYear; year >= 1950; year -= 1) {
+    const opt = document.createElement("option");
+    opt.value = String(year);
+    opt.textContent = String(year);
+    if (saved && year === saved.year) opt.selected = true;
+    y.appendChild(opt);
+  }
+  for (let month = 1; month <= 12; month += 1) {
+    const opt = document.createElement("option");
+    opt.value = String(month).padStart(2, "0");
+    opt.textContent = `${month}월`;
+    if (saved && month === saved.month) opt.selected = true;
+    m.appendChild(opt);
+  }
+  for (let day = 1; day <= 31; day += 1) {
+    const opt = document.createElement("option");
+    opt.value = String(day).padStart(2, "0");
+    opt.textContent = `${day}일`;
+    if (saved && day === saved.day) opt.selected = true;
+    d.appendChild(opt);
+  }
+  if (!saved) {
+    y.value = String(1996);
+    m.value = "05";
+    d.value = "20";
+  }
+}
+function updateFortuneFromBirthday() {
   const birthday = `${document.getElementById("fortune-year").value}-${document.getElementById("fortune-month").value}-${document.getElementById("fortune-day").value}`;
-  try { const data = await apiPost("/api/fortune", { birthday }); const score = Number(data.score || data.total || data.data?.score || 95); state.fortuneScore = Number.isFinite(score) ? Math.max(1, Math.min(100, score)) : 95; closeSheet(); showToast("실제 운세 API 결과로 갱신했어요."); setTimeout(animateGauge, 100); }
-  catch (error) { showToast(error.message || "운세 조회에 실패했어요."); }
+  if (!parseBirthday(birthday)) {
+    showToast("올바른 생년월일을 선택해 주세요.");
+    return;
+  }
+  saveFortuneBirthday(birthday);
+  refreshFortune();
+  closeSheet();
+  renderFortuneUI();
+  showToast("오늘의 운세를 계산했어요.");
+  setTimeout(animateGauge, 100);
+}
+function initFortune() {
+  state.fortuneBirthday = loadFortuneBirthday();
+  refreshFortune();
+  renderFortuneUI();
 }
 
 function bindSegmentButtons() { document.querySelectorAll(".seg").forEach((seg) => seg.addEventListener("click", (e) => { const btn = e.target.closest("button"); if (!btn) return; seg.querySelectorAll("button").forEach((x) => x.classList.remove("on")); btn.classList.add("on"); showToast(btn.textContent.trim() + " 설정을 적용했어요"); })); }
@@ -820,6 +1121,7 @@ function bindFindAccountTabs() {
 (async function bootstrap() {
   applyTheme(localStorage.getItem("handam-theme") || "light");
   bindMoodPicker("#emo-pick"); bindMoodPicker("#manual-mood"); bindSegmentButtons(); bindFindAccountTabs(); bindAdminControls();
+  initFortune();
   fillBirthdaySelects();
   document.getElementById("ocr-camera-file").addEventListener("change", (e) => runOCRFile(e.target.files?.[0]));
   document.getElementById("ocr-gallery-file").addEventListener("change", (e) => runOCRFile(e.target.files?.[0]));
