@@ -16,6 +16,16 @@ for (const file of staticFiles) {
   fs.copyFileSync(path.join(root, file), path.join(output, file));
 }
 
+const dataDir = path.join(root, "data");
+if (fs.existsSync(dataDir)) {
+  fs.mkdirSync(path.join(output, "data"), { recursive: true });
+  for (const name of fs.readdirSync(dataDir)) {
+    if (name.endsWith(".json")) {
+      fs.copyFileSync(path.join(dataDir, name), path.join(output, "data", name));
+    }
+  }
+}
+
 const uiDist = path.join(root, "ui-dist");
 if (fs.existsSync(uiDist)) {
   fs.mkdirSync(path.join(output, "ui-dist"), { recursive: true });

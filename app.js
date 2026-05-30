@@ -54,38 +54,8 @@ let presenceTimer = null;
 let dbWorker, workerSeq = 0;
 const workerWaiters = new Map();
 const promptRotation = { 행복: 0, 평온: 0, 설렘: 0, 차분: 0, 지침: 0, default: 0 };
-const promptByMood = {
-  행복: [
-    { emoji: "🍜", title: "가장 행복했던 한 끼", desc: "최근 기록에서 좋은 순간이 많았어요. 기억나는 맛을 적어볼까요?", keywords: ["음식", "맛", "식사", "밥", "카페", "먹"] },
-    { emoji: "🎉", title: "웃음이 터졌던 장면", desc: "오늘 가장 크게 웃었던 순간을 구체적으로 남겨보세요.", keywords: ["웃", "친구", "즐거", "행복", "축하"] },
-    { emoji: "🌞", title: "기분 좋은 습관", desc: "행복을 키워준 작은 습관 하나를 써볼까요?", keywords: ["습관", "루틴", "아침", "운동", "산책"] },
-  ],
-  평온: [
-    { emoji: "🌙", title: "요즘 나를 쉬게 하는 것", desc: "평온했던 루틴 하나를 떠올려 보세요.", keywords: ["휴식", "잠", "차", "조용", "편안"] },
-    { emoji: "☕", title: "조용했던 순간", desc: "오늘 가장 조용하고 편안했던 장면을 기록해보세요.", keywords: ["조용", "혼자", "카페", "창가", "바람"] },
-    { emoji: "🍃", title: "천천히 숨 쉬던 때", desc: "마음이 안정됐던 순간을 문장으로 남겨보세요.", keywords: ["호흡", "명상", "산책", "하늘", "평온"] },
-  ],
-  설렘: [
-    { emoji: "✨", title: "기대되는 내일", desc: "요즘 가장 기다려지는 일은 무엇인가요?", keywords: ["기대", "내일", "계획", "여행", "만남"] },
-    { emoji: "🚀", title: "새로 시작한 도전", desc: "새롭게 시작한 일의 첫 감정을 기록해보세요.", keywords: ["시작", "도전", "프로젝트", "공부", "새로"] },
-    { emoji: "💡", title: "아이디어가 번뜩인 순간", desc: "떠오른 아이디어를 놓치지 말고 남겨보세요.", keywords: ["아이디어", "영감", "떠오", "계획", "꿈"] },
-  ],
-  차분: [
-    { emoji: "📷", title: "사진처럼 남은 순간", desc: "오늘을 한 장면으로 고른다면 무엇인가요?", keywords: ["사진", "풍경", "하늘", "거리", "기억"] },
-    { emoji: "🪴", title: "작게 나아진 부분", desc: "어제보다 나아진 점 하나만 써도 충분해요.", keywords: ["성장", "배움", "조금", "나아", "변화"] },
-    { emoji: "✍️", title: "생각 정리 노트", desc: "머릿속을 정리하듯 중요한 생각을 써보세요.", keywords: ["생각", "정리", "고민", "결정", "메모"] },
-  ],
-  지침: [
-    { emoji: "🛌", title: "오늘 나를 버티게 한 것", desc: "힘들었지만 버틸 수 있었던 이유를 적어보세요.", keywords: ["힘", "버티", "지침", "피곤", "위로"] },
-    { emoji: "🤍", title: "나를 위로하는 한마디", desc: "오늘의 나에게 들려주고 싶은 말을 남겨보세요.", keywords: ["위로", "나에게", "괜찮", "쉬", "마음"] },
-    { emoji: "🌧️", title: "무거운 마음 정리", desc: "지친 마음을 그대로 적어도 괜찮아요.", keywords: ["무거", "슬픔", "걱정", "스트레스", "힘들"] },
-  ],
-  default: [
-    { emoji: "💌", title: "1년 뒤의 나에게", desc: "미래의 나에게 전하고 싶은 마음을 적어보세요.", keywords: ["미래", "목표", "꿈", "약속", "편지"] },
-    { emoji: "🧭", title: "다음 주의 작은 약속", desc: "가볍게 실천할 수 있는 약속 하나를 정해보세요.", keywords: ["약속", "계획", "실천", "다음", "주"] },
-    { emoji: "🌱", title: "나를 성장시킨 경험", desc: "최근 배운 점을 짧게 정리해보세요.", keywords: ["배움", "경험", "성장", "교훈", "깨달"] },
-  ],
-};
+let promptByMood = {};
+let fortuneData = null;
 
 function profileStorageKey(uid) { return `handam-profile-${uid || "guest"}`; }
 function loadProfile(uid) {
@@ -136,11 +106,52 @@ function stopPresenceHeartbeat() {
   clearInterval(presenceTimer);
   presenceTimer = null;
 }
+function escapeHtml(text) {
+  return String(text)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
 function getGreeting() {
   const hour = new Date().getHours();
-  if (hour < 12) return "좋은 아침이에요";
-  if (hour < 18) return "좋은 오후예요";
-  return "좋은 저녁이에요";
+  if (hour >= 5 && hour < 11) return "상쾌한 아침이에요";
+  if (hour >= 11 && hour < 14) return "좋은 점심이에요";
+  if (hour >= 14 && hour < 18) return "따뜻한 오후예요";
+  if (hour >= 18 && hour < 22) return "편안한 저녁이에요";
+  if (hour >= 22 || hour < 2) return "선선한 밤이에요";
+  return "고요한 새벽이에요";
+}
+function buildPromptByMoodFromJson(json) {
+  const map = {};
+  for (const [mood, items] of Object.entries(json?.moods || {})) {
+    map[mood] = (items || []).map((item) => ({
+      emoji: item.emoji || "✍️",
+      title: item.title || "",
+      desc: item.example || item.desc || "",
+      keywords: item.keywords || [],
+      emotion: item.emotion || mood,
+    }));
+  }
+  return map;
+}
+async function loadAppData() {
+  try {
+    const [promptsRes, fortuneRes] = await Promise.all([
+      fetch("./data/prompts.json"),
+      fetch("./data/fortune.json"),
+    ]);
+    if (promptsRes.ok) {
+      const promptsJson = await promptsRes.json();
+      promptByMood = buildPromptByMoodFromJson(promptsJson);
+    }
+    if (fortuneRes.ok) fortuneData = await fortuneRes.json();
+  } catch (_error) {
+    console.warn("앱 데이터 JSON 로드 실패 — 기본값 사용");
+  }
+  if (!Object.keys(promptByMood).length) {
+    promptByMood = { default: [{ emoji: "✍️", title: "오늘의 한 줄", desc: "오늘 마음을 짧게 남겨보세요.", keywords: [] }] };
+  }
 }
 function formatTodayLabel() {
   const now = new Date();
@@ -191,10 +202,22 @@ function computeWritingStreak(records) {
   }
   return streak;
 }
+function bindHomeWeekStrip() {
+  const strip = document.getElementById("home-weekstrip");
+  if (!strip || strip.dataset.bound === "1") return;
+  strip.dataset.bound = "1";
+  strip.addEventListener("click", (e) => {
+    const day = e.target.closest(".day");
+    if (!day) return;
+    const dot = day.querySelector(".dot");
+    if (dot?.classList.contains("dot-add")) go("diary");
+  });
+}
 function updateHomeWeekDiary() {
   const summaryEl = document.getElementById("home-week-summary");
   const strip = document.getElementById("home-weekstrip");
   if (!strip) return;
+  bindHomeWeekStrip();
   const weekDates = getMondayWeekDates(new Date());
   const todayKey = toDateKey(new Date());
   const labels = ["월", "화", "수", "목", "금", "토", "일"];
@@ -214,14 +237,19 @@ function updateHomeWeekDiary() {
     const lbl = dayEl.querySelector(".lbl");
     const dot = dayEl.querySelector(".dot");
     dayEl.classList.toggle("today", isToday);
+    dayEl.classList.toggle("day-add", isToday && !record);
     if (lbl) lbl.textContent = labels[index];
     if (!dot) return;
+    dot.classList.remove("dot-add");
+    dot.removeAttribute("title");
     if (record) {
       dot.textContent = moodToEmoji(record.mood);
       dot.style.opacity = "1";
     } else if (isToday) {
       dot.textContent = "＋";
       dot.style.opacity = "1";
+      dot.classList.add("dot-add");
+      dot.title = "오늘 일기 쓰기";
     } else {
       dot.textContent = "";
       dot.style.opacity = "0.35";
@@ -255,7 +283,9 @@ function updateUserUI() {
   const name = getDisplayName();
   const greeting = getGreeting();
   const el = (id) => document.getElementById(id);
-  if (el("home-greeting")) el("home-greeting").innerHTML = `${greeting},<br>${name}님 ☀️`;
+  if (el("home-greeting")) {
+    el("home-greeting").innerHTML = `${greeting},<br><span class="home-greeting-name">${escapeHtml(name)}</span>님 ☀️`;
+  }
   if (el("home-date")) el("home-date").textContent = formatTodayLabel();
   if (el("settings-display-name")) el("settings-display-name").textContent = name;
   if (el("settings-email")) el("settings-email").textContent = state.auth?.email || state.profile?.email || "로그인이 필요해요";
@@ -964,48 +994,14 @@ async function exportDiaries() {
 }
 
 const FORTUNE_BIRTHDAY_KEY = "handam-fortune-birthday";
-const LUCKY_COLORS = [
+const FALLBACK_LUCKY_COLORS = [
   { name: "스카이 블루", hex: "#7FB7D9" },
   { name: "코랄 핑크", hex: "#F4A5A0" },
-  { name: "민트 그린", hex: "#8BC9A8" },
-  { name: "라벤더", hex: "#B8A9E8" },
-  { name: "선샤인 옐로", hex: "#F2D06B" },
-  { name: "피치", hex: "#F5B88A" },
 ];
-const FORTUNE_QUOTES = {
-  high: [
-    "말하는 대로 이루어지는<br>마법 같은 하루입니다.",
-    "작은 용기가 큰 기회로<br>이어지는 날이에요.",
-    "주변의 응원이 당신에게<br>큰 힘이 됩니다.",
-  ],
-  mid: [
-    "차분히 한 걸음씩 나아가면<br>분명 좋은 흐름이 와요.",
-    "오늘은 준비와 정리에<br>집중하기 좋은 날입니다.",
-    "무리하지 않아도<br>충분히 잘 해낼 수 있어요.",
-  ],
-  low: [
-    "잠시 쉬어가도 괜찮아요.<br>내일은 더 가벼워집니다.",
-    "조급함보다 차분함이<br>오늘의 열쇠입니다.",
-    "작은 실수는 지나가고,<br>배움만 남는 하루예요.",
-  ],
-};
-const FORTUNE_ADVICE = {
-  love: [
-    "대화가 물 흐르듯 자연스럽게 풀립니다.",
-    "진심을 전하면 좋은 반응을 받을 수 있어요.",
-    "상대의 말에 귀 기울이면 관계가 깊어집니다.",
-  ],
-  money: [
-    "작은 횡재수, 주변을 잘 살펴보세요.",
-    "계획적인 소비가 오늘의 행운을 키워요.",
-    "예상치 못한 이득보다 꾸준함이 유리합니다.",
-  ],
-  work: [
-    "집중력이 최고조, 능률이 크게 오릅니다.",
-    "미뤄둔 일을 처리하기 좋은 타이밍이에요.",
-    "협업에서 당신의 역할이 빛날 수 있습니다.",
-  ],
-};
+const FALLBACK_TOTAL_TIERS = [
+  { min: 75, label: "좋음", messages: ["오늘도 좋은 하루 되세요."] },
+  { min: 0, label: "보통", messages: ["차분히 하루를 보내세요."] },
+];
 
 function fortuneHash(input) {
   let h = 2166136261;
@@ -1059,11 +1055,25 @@ function getChineseZodiac(year) {
   const animals = ["원숭이", "닭", "개", "돼지", "쥐", "소", "호랑이", "토끼", "용", "뱀", "말", "양"];
   return `${animals[((year % 12) + 12) % 12]}띠`;
 }
+function getFortuneTiers() {
+  return fortuneData?.totalScore?.tiers?.length ? fortuneData.totalScore.tiers : FALLBACK_TOTAL_TIERS;
+}
+function getLuckyColors() {
+  return fortuneData?.luckyColors?.length ? fortuneData.luckyColors : FALLBACK_LUCKY_COLORS;
+}
 function fortuneTier(score) {
-  if (score >= 90) return { label: "매우 좋음", key: "high" };
-  if (score >= 75) return { label: "좋음", key: "high" };
-  if (score >= 60) return { label: "보통", key: "mid" };
-  return { label: "주의", key: "low" };
+  const tiers = [...getFortuneTiers()].sort((a, b) => b.min - a.min);
+  const tier = tiers.find((t) => score >= t.min) || tiers[tiers.length - 1];
+  return { label: tier.label, key: String(tier.min) };
+}
+function fortuneMessageByScore(categoryKey, score, seed) {
+  const ranges = fortuneData?.categories?.[categoryKey]?.ranges;
+  if (!ranges?.length) return "";
+  const sorted = [...ranges].sort((a, b) => b.min - a.min);
+  const range = sorted.find((r) => score >= r.min) || sorted[sorted.length - 1];
+  const messages = range.messages || [];
+  if (!messages.length) return "";
+  return fortunePick(messages, seed);
 }
 function calculateFortune(birthday, today = new Date()) {
   const parsed = parseBirthday(birthday);
@@ -1077,28 +1087,34 @@ function calculateFortune(birthday, today = new Date()) {
   const ageBoost = (today.getFullYear() - parsed.year) % 5;
   const total = Math.max(1, Math.min(100, fortuneScore(totalSeed, 52, 98) + zodiacBoost - 2 + ageBoost));
   const tier = fortuneTier(total);
-  const color = fortunePick(LUCKY_COLORS, fortuneSeed(base, "color"));
+  const luckyColors = getLuckyColors();
+  const color = fortunePick(luckyColors, fortuneSeed(base, "color"));
   const numA = 1 + (fortuneSeed(base, "numA") % 9);
   const numB = 10 + (fortuneSeed(base, "numB") % 90);
+  const tiers = [...getFortuneTiers()].sort((a, b) => b.min - a.min);
+  const totalTier = tiers.find((t) => total >= t.min) || tiers[tiers.length - 1];
+  const loveScore = fortuneScore(fortuneSeed(base, "love"), 50, 99);
+  const moneyScore = fortuneScore(fortuneSeed(base, "money"), 48, 97);
+  const workScore = fortuneScore(fortuneSeed(base, "work"), 52, 99);
   return {
     total,
-    tier,
+    tier: { label: totalTier.label, key: String(totalTier.min) },
     zodiac,
     chinese,
     color,
     numbers: [numA, numB],
-    quote: fortunePick(FORTUNE_QUOTES[tier.key], fortuneSeed(base, "quote")),
+    quote: fortunePick(totalTier.messages || [], fortuneSeed(base, "quote")),
     love: {
-      score: fortuneScore(fortuneSeed(base, "love"), 50, 99),
-      text: fortunePick(FORTUNE_ADVICE.love, fortuneSeed(base, "loveText")),
+      score: loveScore,
+      text: fortuneMessageByScore("love", loveScore, fortuneSeed(base, "loveText")),
     },
     money: {
-      score: fortuneScore(fortuneSeed(base, "money"), 48, 97),
-      text: fortunePick(FORTUNE_ADVICE.money, fortuneSeed(base, "moneyText")),
+      score: moneyScore,
+      text: fortuneMessageByScore("money", moneyScore, fortuneSeed(base, "moneyText")),
     },
     work: {
-      score: fortuneScore(fortuneSeed(base, "work"), 52, 99),
-      text: fortunePick(FORTUNE_ADVICE.work, fortuneSeed(base, "workText")),
+      score: workScore,
+      text: fortuneMessageByScore("work", workScore, fortuneSeed(base, "workText")),
     },
   };
 }
@@ -1300,7 +1316,9 @@ function bindFindAccountTabs() {
 
 (async function bootstrap() {
   applyTheme(localStorage.getItem("handam-theme") || "light");
+  await loadAppData();
   bindMoodPicker("#emo-pick"); bindMoodPicker("#manual-mood"); bindSegmentButtons(); bindFindAccountTabs(); bindAdminControls();
+  bindHomeWeekStrip();
   initFortune();
   fillBirthdaySelects();
   initInteractions();

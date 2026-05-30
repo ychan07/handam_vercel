@@ -340,6 +340,18 @@ input,textarea,select{font-size:16px}
 }
 .day.today .lbl{color:var(--accent)}
 .day.today .dot{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+.day.day-add{cursor:pointer}
+.day .dot.dot-add{
+  color:#fff;background:var(--accent);border-color:var(--accent);
+  font-size:18px;font-weight:800;line-height:1;
+  transition:transform .32s var(--ease-spring-bounce),background .2s ease;
+}
+.day.day-add:active .dot.dot-add{transform:scale(.9)}
+.home-greeting-name{
+  background:var(--grad-fortune);
+  -webkit-background-clip:text;background-clip:text;
+  -webkit-text-fill-color:transparent;
+}
 
 /* ===== Fortune home card ===== */
 .fortune-hero{
