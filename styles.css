@@ -62,7 +62,7 @@ html{
 }
 body{
   height:100%;
-  font-family:'Pretendard',sans-serif;
+  font-family:'Pretendard',"Segoe UI Emoji","Segoe UI Symbol","Apple Color Emoji",sans-serif;
   background:#100F0C;
   color:var(--text);
   display:flex;align-items:center;justify-content:center;
@@ -375,29 +375,43 @@ input,textarea,select{font-size:16px}
   box-shadow:0 0 0 3px var(--accent-soft);
 }
 .day.day-add:active .dot.dot-add{transform:scale(.9)}
-#home-greeting{
+.home-greeting-title{
+  font-size:25px;font-weight:800;letter-spacing:-.03em;
+  color:var(--text);
   background:none;
   -webkit-background-clip:border-box;
   background-clip:border-box;
   -webkit-text-fill-color:var(--text);
-  color:var(--text);
 }
-#home-greeting .home-greeting-line,
-#home-greeting .home-greeting-tail{
-  -webkit-text-fill-color:var(--text);
+[data-theme="dark"] .home-greeting-title{color:var(--text)}
+.home-greeting-line,
+.home-greeting-tail{
   color:var(--text);
+  -webkit-text-fill-color:var(--text);
 }
 .home-greeting-name{
   background:var(--grad-fortune);
   -webkit-background-clip:text;background-clip:text;
   -webkit-text-fill-color:transparent;
 }
-.home-greeting-emoji{
-  font-family:"Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif;
-  -webkit-text-fill-color:initial;
-  color:initial;
+.home-greeting-icon{
+  font-family:"Font Awesome 6 Free";
+  font-weight:900;
   font-style:normal;
+  font-size:22px;
   line-height:1;
+  margin-left:3px;
+  vertical-align:-2px;
+  display:inline-block;
+  color:var(--accent);
+  background:none;
+  -webkit-background-clip:border-box;
+  background-clip:border-box;
+  -webkit-text-fill-color:var(--accent);
+}
+[data-theme="dark"] .home-greeting-icon{
+  color:var(--gold);
+  -webkit-text-fill-color:var(--gold);
 }
 
 /* ===== Fortune home card ===== */

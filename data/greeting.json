@@ -4,6 +4,7 @@
       "start": 5,
       "end": 11,
       "emoji": "☀️",
+      "icon": "sun",
       "messages": [
         "상쾌한 아침이에요",
         "맑은 아침이에요",
@@ -15,6 +16,7 @@
       "start": 11,
       "end": 14,
       "emoji": "🍱",
+      "icon": "utensils",
       "messages": [
         "좋은 점심이에요",
         "맛있는 점심 되세요",
@@ -25,6 +27,7 @@
       "start": 14,
       "end": 18,
       "emoji": "🌤️",
+      "icon": "cloud-sun",
       "messages": [
         "따뜻한 오후예요",
         "여유로운 오후예요",
@@ -35,6 +38,7 @@
       "start": 18,
       "end": 22,
       "emoji": "🌆",
+      "icon": "city",
       "messages": [
         "편안한 저녁이에요",
         "느긋한 저녁이에요",
@@ -46,6 +50,7 @@
       "end": 2,
       "wrap": true,
       "emoji": "🌙",
+      "icon": "moon",
       "messages": [
         "선선한 밤이에요",
         "고요한 밤이에요",
@@ -55,7 +60,8 @@
     {
       "start": 2,
       "end": 5,
-      "emoji": "🌌",
+      "emoji": "🌙",
+      "icon": "moon",
       "messages": [
         "고요한 새벽이에요",
         "차분한 새벽이에요",

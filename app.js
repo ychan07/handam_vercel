@@ -122,13 +122,21 @@ function escapeHtml(text) {
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;");
 }
+const GREETING_ICON_BY_EMOJI = {
+  "☀️": "sun",
+  "🍱": "utensils",
+  "🌤️": "cloud-sun",
+  "🌆": "city",
+  "🌙": "moon",
+  "🌌": "moon",
+};
 const FALLBACK_GREETINGS = [
-  { start: 5, end: 11, emoji: "☀️", messages: ["상쾌한 아침이에요"] },
-  { start: 11, end: 14, emoji: "🍱", messages: ["좋은 점심이에요"] },
-  { start: 14, end: 18, emoji: "🌤️", messages: ["따뜻한 오후예요"] },
-  { start: 18, end: 22, emoji: "🌆", messages: ["편안한 저녁이에요"] },
-  { start: 22, end: 2, wrap: true, emoji: "🌙", messages: ["선선한 밤이에요"] },
-  { start: 2, end: 5, emoji: "🌌", messages: ["고요한 새벽이에요"] },
+  { start: 5, end: 11, emoji: "☀️", icon: "sun", messages: ["상쾌한 아침이에요"] },
+  { start: 11, end: 14, emoji: "🍱", icon: "utensils", messages: ["좋은 점심이에요"] },
+  { start: 14, end: 18, emoji: "🌤️", icon: "cloud-sun", messages: ["따뜻한 오후예요"] },
+  { start: 18, end: 22, emoji: "🌆", icon: "city", messages: ["편안한 저녁이에요"] },
+  { start: 22, end: 2, wrap: true, emoji: "🌙", icon: "moon", messages: ["선선한 밤이에요"] },
+  { start: 2, end: 5, emoji: "🌙", icon: "moon", messages: ["고요한 새벽이에요"] },
 ];
 function greetingSlots() {
   return greetingData?.greetings?.length ? greetingData.greetings : FALLBACK_GREETINGS;
@@ -149,8 +157,39 @@ function getGreeting() {
   const seed = fortuneSeed(`${formatDateKey(new Date())}|greeting`, String(slot?.start ?? 0));
   return fortunePick(messages, seed);
 }
-function getGreetingEmoji() {
-  return getGreetingSlot()?.emoji || "☀️";
+function getGreetingIconClass(slot = getGreetingSlot()) {
+  const icon = String(slot?.icon || "").trim().replace(/^fa-/, "");
+  if (icon) return icon;
+  return GREETING_ICON_BY_EMOJI[slot?.emoji] || "sun";
+}
+function renderHomeGreeting() {
+  const root = document.getElementById("home-greeting");
+  if (!root) return;
+  const name = getDisplayName();
+  const greeting = getGreeting();
+  const iconClass = getGreetingIconClass();
+
+  root.replaceChildren();
+
+  const line = document.createElement("span");
+  line.className = "home-greeting-line";
+  line.textContent = `${greeting},`;
+  root.append(line, document.createElement("br"));
+
+  const nameSpan = document.createElement("span");
+  nameSpan.className = "home-greeting-name";
+  nameSpan.textContent = name;
+  root.appendChild(nameSpan);
+
+  const tail = document.createElement("span");
+  tail.className = "home-greeting-tail";
+  tail.append("님 ");
+
+  const icon = document.createElement("i");
+  icon.className = `fa-solid fa-${iconClass} home-greeting-icon`;
+  icon.setAttribute("aria-hidden", "true");
+  tail.appendChild(icon);
+  root.appendChild(tail);
 }
 function buildPromptByMoodFromJson(json) {
   const map = {};
@@ -408,15 +447,8 @@ function updateDiaryStatsUI() {
 }
 function updateUserUI() {
   const name = getDisplayName();
-  const greeting = getGreeting();
-  const greetingEmoji = getGreetingEmoji();
   const el = (id) => document.getElementById(id);
-  if (el("home-greeting")) {
-    el("home-greeting").innerHTML =
-      `<span class="home-greeting-line">${escapeHtml(greeting)},</span><br>` +
-      `<span class="home-greeting-name">${escapeHtml(name)}</span>` +
-      `<span class="home-greeting-tail">님 <span class="home-greeting-emoji" role="img" aria-hidden="true">${greetingEmoji}</span></span>`;
-  }
+  renderHomeGreeting();
   if (el("home-date")) el("home-date").textContent = formatTodayLabel();
   if (el("settings-display-name")) el("settings-display-name").textContent = name;
   if (el("settings-email")) el("settings-email").textContent = state.auth?.email || state.profile?.email || "로그인이 필요해요";
