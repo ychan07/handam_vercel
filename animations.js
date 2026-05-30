@@ -1,6 +1,6 @@
 /**
  * Animation & timing config — loaded from data/animations.json.
- * JSON 파일에는 // · /* */ 주석을 쓸 수 있습니다 (parseJsonWithComments).
+ * JSON 파일에는 줄(//)·블록 주석을 쓸 수 있습니다 (parseJsonWithComments).
  */
 
 /** @param {string} text */
