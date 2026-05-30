@@ -214,6 +214,14 @@ function authErrorMessage(error, context = {}) {
   return message || "인증 처리에 실패했어요.";
 }
 
+function replayRevealAnimations(pageEl) {
+  pageEl.querySelectorAll(".reveal").forEach((el) => {
+    el.style.animation = "none";
+    void el.offsetWidth;
+    el.style.animation = "";
+  });
+}
+
 function go(id) {
   const target = document.getElementById("page-" + id);
   if (!target) return;
@@ -221,6 +229,7 @@ function go(id) {
   document.querySelectorAll(".nav-item").forEach((n) => n.classList.toggle("active", n.dataset.page === id));
   document.querySelector(".device")?.classList.toggle("auth-mode", AUTH_PAGES.has(id));
   target.scrollTop = 0;
+  replayRevealAnimations(target);
   if (id === "diary") resetOCR();
   if (id === "fortune") setTimeout(animateGauge, 160);
   if (id === "records") renderRecordsPage();

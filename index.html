@@ -15,9 +15,11 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Nanum+Myeongjo:wght@400;700;800&display=swap">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 <link rel="stylesheet" href="./styles.css">
+<link rel="stylesheet" href="./ui-dist/ui.css" id="ui-styles">
 </head>
 <body>
-<div class="device">
+<div id="splash-root"></div>
+<div class="device app-shell--loading">
 
   <!-- ============ HOME ============ -->
   <div id="page-home" class="page active">
@@ -512,12 +514,13 @@
   <!-- ============ LOGIN ============ -->
   <div id="page-login" class="page">
     <div class="pad auth-pad">
-      <div class="reveal" style="--d:.02s;padding:40px 0 18px">
-        <div class="brand">
-          <div class="brand-mark"><i class="fa-solid fa-feather-pointed"></i></div>
+      <div class="auth-hero reveal" style="--d:.02s">
+        <div class="auth-logo"><i class="fa-solid fa-feather-pointed"></i></div>
+        <div class="brand" style="justify-content:center;margin-bottom:0">
           <span class="brand-name">HANDAM · 한담</span>
         </div>
-        <h1 class="h-page" style="margin-top:10px">다시 한담을<br>시작해볼까요?</h1>
+        <h1 class="h-page" style="margin-top:12px">다시 한담을<br>시작해볼까요?</h1>
+        <p class="muted" style="font-size:13px;font-weight:700;margin-top:8px">마음을 담는 하루의 기록</p>
       </div>
       <div class="card reveal" style="--d:.07s;margin-top:12px">
         <label class="field-label">이메일</label>
@@ -715,6 +718,7 @@
 
 </div>
 
+<script type="module" src="./ui-dist/ui.bundle.js"></script>
 <script type="module" src="./app.js"></script>
 </body>
 </html>
