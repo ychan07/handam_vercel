@@ -103,15 +103,6 @@ function getDisplayName() {
   if (email.includes("@")) return email.split("@")[0];
   return "한담";
 }
-function formatPhoneDisplay(e164) {
-  if (!e164) return "";
-  const digits = e164.replace(/\D/g, "");
-  if (digits.startsWith("82")) {
-    const local = `0${digits.slice(2)}`;
-    return local.replace(/(\d{3})(\d{3,4})(\d{4})/, "$1-$2-$3");
-  }
-  return e164;
-}
 function getAppPublicUrl() {
   return window.location.origin.replace(/\/$/, "");
 }
@@ -128,7 +119,6 @@ async function sendPresenceHeartbeat() {
     await apiPost("/api/presence", {
       uid: state.auth.uid,
       email: state.auth.email || null,
-      phone: state.profile?.phone || auth.currentUser?.phoneNumber || null,
       displayName: getDisplayName(),
     });
   } catch (_e) {}
@@ -161,8 +151,6 @@ function updateUserUI() {
   if (el("home-date")) el("home-date").textContent = formatTodayLabel();
   if (el("settings-display-name")) el("settings-display-name").textContent = name;
   if (el("settings-email")) el("settings-email").textContent = state.auth?.email || state.profile?.email || "로그인이 필요해요";
-  const phoneText = state.profile?.phone || state.auth?.phone || auth.currentUser?.phoneNumber;
-  if (el("settings-phone")) el("settings-phone").textContent = phoneText ? formatPhoneDisplay(phoneText) : "등록된 연락처 없음";
   if (el("settings-avatar")) el("settings-avatar").textContent = name.slice(0, 1);
   if (el("diary-date-label")) el("diary-date-label").textContent = formatTodayLabel();
 }
@@ -198,14 +186,12 @@ async function setAuthFromUser(user) {
   state.auth = {
     uid: user.uid,
     email: user.email || null,
-    phone: user.phoneNumber || null,
     idToken,
   };
   state.profile = loadProfile(user.uid);
   const patch = {};
   if (!state.profile?.displayName && user.displayName) patch.displayName = user.displayName;
   if (!state.profile?.email && user.email) patch.email = user.email;
-  if (!state.profile?.phone && user.phoneNumber) patch.phone = user.phoneNumber;
   if (Object.keys(patch).length) state.profile = saveProfile(user.uid, patch);
   localStorage.setItem("handam-auth", JSON.stringify(state.auth));
   updateUserUI();
@@ -378,7 +364,6 @@ async function login() {
 async function registerFromSignup() {
   const displayName = document.getElementById("signup-name").value.trim();
   const email = document.getElementById("signup-email").value.trim();
-  const phone = document.getElementById("signup-phone").value.trim();
   const password = document.getElementById("signup-password").value;
   const confirm = document.getElementById("signup-password-confirm").value;
   if (!displayName) return showToast("이름을 입력해주세요.");
@@ -388,7 +373,7 @@ async function registerFromSignup() {
   try {
     const credential = await createUserWithEmailAndPassword(auth, email, password);
     await updateProfile(credential.user, { displayName });
-    saveProfile(credential.user.uid, { displayName, email, phone: phone || null });
+    saveProfile(credential.user.uid, { displayName, email });
     await setAuthFromUser(credential.user);
     showToast(`${displayName}님, 가입을 환영해요!`);
     go("home");

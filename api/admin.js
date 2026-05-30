@@ -37,10 +37,10 @@ module.exports = async function handler(req, res) {
     }
 
     if (action === "presence") {
-      const { uid, email, displayName, phone } = body;
+      const { uid, email, displayName } = body;
       if (!uid) return sendJson(res, 400, { error: "uid is required" });
       if (hasFirebaseAdmin()) {
-        await touchPresence(uid, { email: email || null, displayName: displayName || null, phone: phone || null });
+        await touchPresence(uid, { email: email || null, displayName: displayName || null });
       }
       return sendJson(res, 200, { ok: true });
     }
