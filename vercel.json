@@ -4,13 +4,21 @@
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
   "rewrites": [
-    {
-      "source": "/api/(.*)",
-      "destination": "/api/$1"
-    },
-    {
-      "source": "/(.*)",
-      "destination": "/index.html"
-    }
+    { "source": "/api/auth/login", "destination": "/api/auth?action=login" },
+    { "source": "/api/auth/register", "destination": "/api/auth?action=register" },
+    { "source": "/api/auth/change-password", "destination": "/api/auth?action=change-password" },
+    { "source": "/api/admin/login", "destination": "/api/admin?action=login" },
+    { "source": "/api/admin/stats", "destination": "/api/admin?action=stats" },
+    { "source": "/api/admin/users", "destination": "/api/admin?action=users" },
+    { "source": "/api/admin/reset-password", "destination": "/api/admin?action=reset-password" },
+    { "source": "/api/admin/credentials", "destination": "/api/admin?action=credentials" },
+    { "source": "/api/admin/toggle-user", "destination": "/api/admin?action=toggle-user" },
+    { "source": "/api/admin/delete-user", "destination": "/api/admin?action=delete-user" },
+    { "source": "/api/admin/reset-link", "destination": "/api/admin?action=reset-link" },
+    { "source": "/api/presence", "destination": "/api/admin?action=presence" },
+    { "source": "/api/ocr", "destination": "/api/services?action=ocr" },
+    { "source": "/api/llm/summarize", "destination": "/api/services?action=summarize" },
+    { "source": "/api/fortune", "destination": "/api/services?action=fortune" },
+    { "source": "/(.*)", "destination": "/index.html" }
   ]
 }
