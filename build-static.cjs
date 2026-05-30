@@ -4,7 +4,7 @@ const { execSync } = require("child_process");
 
 const root = __dirname;
 const output = path.join(root, "dist");
-const staticFiles = ["index.html", "styles.css", "app.js", "interactions.js", "prompt-animations.js", "db-worker.js", "manifest.webmanifest"];
+const staticFiles = ["index.html", "styles.css", "app.js", "interactions.js", "prompt-animations.js", "segment-control.js", "db-worker.js", "manifest.webmanifest"];
 
 console.log("Building React UI (react-bits splash)...");
 execSync("npx vite build", { cwd: root, stdio: "inherit" });

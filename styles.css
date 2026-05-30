@@ -546,11 +546,27 @@ input,textarea,select{font-size:16px}
 .seg button{
   flex:1;border:0;background:none;font-family:inherit;font-size:12px;font-weight:800;
   padding:8px 0;border-radius:10px;color:var(--text-muted);cursor:pointer;
-  transition:transform .35s var(--ease-spring),background .25s ease,color .25s ease,box-shadow .25s ease;
+  transition:transform .35s var(--ease-spring),color .25s ease;
   position:relative;overflow:hidden;
 }
 .seg button:active{transform:scale(.94)}
 .seg button.on{background:var(--surface);color:var(--accent);box-shadow:var(--shadow)}
+.seg-elastic{position:relative}
+.seg-elastic .seg-pill{
+  position:absolute;top:3px;bottom:3px;left:0;
+  border-radius:10px;background:var(--surface);
+  box-shadow:var(--shadow);
+  z-index:0;pointer-events:none;
+  transform-origin:center center;
+  will-change:transform,width;
+}
+.seg-elastic button{
+  z-index:1;background:transparent!important;box-shadow:none!important;
+  transition:transform .35s var(--ease-spring-bounce),color .28s var(--ease-spring);
+}
+.seg-elastic button.on{color:var(--accent)}
+[data-theme="dark"] .seg-elastic button.on{color:var(--gold)}
+.seg-elastic button:active{transform:scale(.92)}
 
 /* ===== Bottom nav + FAB ===== */
 .bottom-nav{

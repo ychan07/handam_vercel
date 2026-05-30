@@ -3,32 +3,26 @@ import { motion, AnimatePresence } from "motion/react";
 import Aurora from "@/components/Aurora";
 import BlurText from "@/components/BlurText";
 import ShinyText from "@/components/ShinyText";
+import RotatingText from "@/components/RotatingText";
 
 type SplashScreenProps = {
   onDone: () => void;
 };
 
-const SPLASH_STATUS_LINES = [
-  "글감을 엄선하는 중",
-  "최근 마음 패턴을 살펴보는 중",
-  "오늘의 운세를 준비하는 중",
-  "일기 장을 펼치는 중",
-  "따뜻한 문장을 고르는 중",
-  "한담을 꾸미는 중",
+/** 앞 문구만 순환 (react-bits RotatingText) */
+const SPLASH_ROTATING_PHRASES = [
+  "다른 글감",
+  "오늘의 운세",
+  "최근 마음 패턴",
+  "일기 장",
+  "따뜻한 문장",
+  "한담",
 ];
 
 export default function SplashScreen({ onDone }: SplashScreenProps) {
   const [phase, setPhase] = useState<"intro" | "exit" | "gone">("intro");
   const [progress, setProgress] = useState(0);
   const [titleDone, setTitleDone] = useState(false);
-  const [statusIndex, setStatusIndex] = useState(0);
-
-  useEffect(() => {
-    const timer = window.setInterval(() => {
-      setStatusIndex((i) => (i + 1) % SPLASH_STATUS_LINES.length);
-    }, 1600);
-    return () => window.clearInterval(timer);
-  }, []);
 
   const finish = useCallback(() => {
     setPhase("exit");
@@ -122,19 +116,21 @@ export default function SplashScreen({ onDone }: SplashScreenProps) {
                 transition={{ duration: 0.25, ease: "easeOut" }}
               />
             </div>
-            <p className="splash-hint">잠시만 기다려 주세요</p>
-            <AnimatePresence mode="wait">
-              <motion.p
-                key={statusIndex}
-                className="splash-status"
-                initial={{ opacity: 0, y: 6 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -4 }}
-                transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
-              >
-                {SPLASH_STATUS_LINES[statusIndex]}
-              </motion.p>
-            </AnimatePresence>
+            <div className="splash-rotating-wrap" aria-live="polite">
+              <RotatingText
+                texts={SPLASH_ROTATING_PHRASES}
+                rotationInterval={1800}
+                splitBy="characters"
+                staggerDuration={0.025}
+                staggerFrom="first"
+                transition={{ type: "spring", damping: 22, stiffness: 280 }}
+                initial={{ y: "100%", opacity: 0, rotateX: -80 }}
+                animate={{ y: 0, opacity: 1, rotateX: 0 }}
+                exit={{ y: "-120%", opacity: 0, rotateX: 80 }}
+                mainClassName="splash-rotating-text"
+                elementLevelClassName="splash-rotating-char"
+              />
+            </div>
           </div>
         </motion.div>
       )}

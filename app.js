@@ -1,6 +1,7 @@
 ﻿import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { getAnalytics, isSupported as analyticsSupported } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-analytics.js";
 import { initInteractions, refreshInteractions } from "./interactions.js";
+import { initElasticSegments } from "./segment-control.js";
 import { animatePromptRefresh } from "./prompt-animations.js";
 import {
   getAuth,
@@ -1114,7 +1115,24 @@ function initFortune() {
   renderFortuneUI();
 }
 
-function bindSegmentButtons() { document.querySelectorAll(".seg").forEach((seg) => seg.addEventListener("click", (e) => { const btn = e.target.closest("button"); if (!btn) return; seg.querySelectorAll("button").forEach((x) => x.classList.remove("on")); btn.classList.add("on"); showToast(btn.textContent.trim() + " 설정을 적용했어요"); })); }
+function bindSegmentButtons() {
+  document.querySelectorAll(".seg:not(.seg-elastic)").forEach((seg) => {
+    seg.addEventListener("click", (e) => {
+      const btn = e.target.closest("button");
+      if (!btn) return;
+      seg.querySelectorAll("button").forEach((x) => x.classList.remove("on"));
+      btn.classList.add("on");
+      showToast(`${btn.textContent.trim()} 설정을 적용했어요`);
+    });
+  });
+  document.querySelectorAll(".seg-elastic").forEach((seg) => {
+    seg.addEventListener("click", (e) => {
+      const btn = e.target.closest("button");
+      if (!btn) return;
+      showToast(`${btn.textContent.trim()} 설정을 적용했어요`);
+    });
+  });
+}
 
 window.deleteCurrentRecord = deleteCurrentRecord;
 window.go = go; window.toggleTheme = toggleTheme; window.toggleSwitch = toggleSwitch;
@@ -1159,6 +1177,7 @@ function bindFindAccountTabs() {
   initFortune();
   fillBirthdaySelects();
   initInteractions();
+  initElasticSegments();
   document.getElementById("ocr-camera-file").addEventListener("change", (e) => runOCRFile(e.target.files?.[0]));
   document.getElementById("ocr-gallery-file").addEventListener("change", (e) => runOCRFile(e.target.files?.[0]));
   document.getElementById("filter-mood").addEventListener("change", renderRecordsPage);
