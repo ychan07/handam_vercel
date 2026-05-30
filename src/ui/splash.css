@@ -90,8 +90,10 @@
   margin-top: 20px;
   min-height: 1.6em;
   display: flex;
-  align-items: center;
+  flex-wrap: wrap;
+  align-items: baseline;
   justify-content: center;
+  gap: 0.2em 0.35em;
   perspective: 520px;
 }
 
@@ -100,7 +102,15 @@
   font-size: 14px;
   font-weight: 800;
   letter-spacing: -0.02em;
-  color: rgba(255, 248, 240, 0.72);
+  color: rgba(255, 248, 240, 0.88);
+}
+
+.splash-rotating-suffix {
+  font-size: 14px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: rgba(255, 248, 240, 0.52);
+  white-space: nowrap;
 }
 
 .splash-rotating-char {

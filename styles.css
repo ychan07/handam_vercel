@@ -647,6 +647,11 @@ input,textarea,select{font-size:16px}
   font-weight:700;color:var(--text);outline:none;
 }
 .textarea{min-height:152px;resize:none;line-height:1.65;font-weight:600}
+.input::placeholder,.textarea::placeholder{
+  color:var(--text-muted);font-weight:600;opacity:1;
+}
+.input:focus::placeholder,.textarea:focus::placeholder{opacity:.45}
+.input:not(:placeholder-shown)::placeholder,.textarea:not(:placeholder-shown)::placeholder{opacity:0}
 .input:focus,.textarea:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
 .list-item.tap{cursor:pointer;transition:background .14s ease}
 .list-item.tap:active{background:var(--surface-2)}

@@ -130,6 +130,7 @@ export default function SplashScreen({ onDone }: SplashScreenProps) {
                 mainClassName="splash-rotating-text"
                 elementLevelClassName="splash-rotating-char"
               />
+              <span className="splash-rotating-suffix">준비중이에요</span>
             </div>
           </div>
         </motion.div>

@@ -40,16 +40,16 @@
       <div class="card reveal" style="--d:.07s;padding:18px">
         <div style="display:flex;justify-content:space-between;align-items:center">
           <span class="h-sec">이번 주 마음 일기</span>
-          <span class="muted" style="font-size:12px;font-weight:700">5일 기록 · 7일 연속 🔥</span>
+          <span class="muted" id="home-week-summary" style="font-size:12px;font-weight:700">0일 기록</span>
         </div>
-        <div class="weekstrip">
-          <div class="day"><span class="lbl">월</span><div class="dot">😊</div></div>
-          <div class="day"><span class="lbl">화</span><div class="dot">😌</div></div>
-          <div class="day"><span class="lbl">수</span><div class="dot">😐</div></div>
-          <div class="day"><span class="lbl">목</span><div class="dot">😊</div></div>
-          <div class="day"><span class="lbl">금</span><div class="dot">😌</div></div>
-          <div class="day"><span class="lbl">토</span><div class="dot" style="opacity:.4"></div></div>
-          <div class="day today"><span class="lbl">일</span><div class="dot">＋</div></div>
+        <div class="weekstrip" id="home-weekstrip">
+          <div class="day"><span class="lbl">월</span><div class="dot"></div></div>
+          <div class="day"><span class="lbl">화</span><div class="dot"></div></div>
+          <div class="day"><span class="lbl">수</span><div class="dot"></div></div>
+          <div class="day"><span class="lbl">목</span><div class="dot"></div></div>
+          <div class="day"><span class="lbl">금</span><div class="dot"></div></div>
+          <div class="day"><span class="lbl">토</span><div class="dot"></div></div>
+          <div class="day"><span class="lbl">일</span><div class="dot"></div></div>
         </div>
       </div>
 
@@ -199,7 +199,7 @@
           <button class="btn btn-primary" onclick="openCameraOCR()"><i class="fa-solid fa-camera"></i> 촬영하기</button>
           <button class="btn btn-ghost" onclick="openGalleryOCR()"><i class="fa-solid fa-image"></i> 보관함</button>
         </div>
-        <div class="card tap reveal" style="--d:.17s;margin-top:14px;display:flex;gap:13px;align-items:center;padding:16px" onclick="go('manual')">
+        <div class="card tap reveal" style="--d:.17s;margin-top:14px;display:flex;gap:13px;align-items:center;padding:16px" onclick="openManualDiary()">
           <div class="diary-thumb" style="background:var(--accent-soft);color:var(--accent)">
             <i class="fa-solid fa-keyboard"></i>
           </div>
@@ -447,9 +447,9 @@
       </div>
       <div class="card reveal" style="--d:.07s">
         <label class="field-label">제목</label>
-        <input class="input" id="manual-title" value="오늘의 작은 발견">
+        <input class="input" id="manual-title" type="text" placeholder="오늘의 작은 발견" autocomplete="off">
         <label class="field-label" style="margin-top:14px">본문</label>
-        <textarea class="textarea" id="manual-body">오늘은 평소보다 천천히 걸었다. 익숙한 길에서도 새로운 간판과 나무 그림자가 눈에 들어왔다.</textarea>
+        <textarea class="textarea" id="manual-body" placeholder="오늘은 평소보다 천천히 걸었다. 익숙한 길에서도 새로운 간판과 나무 그림자가 눈에 들어왔다." autocomplete="off"></textarea>
         <label class="field-label" style="margin-top:14px">감정</label>
         <div class="emo-pick" id="manual-mood">
           <div class="emo-opt sel">😊 행복</div>
@@ -497,7 +497,7 @@
           <div class="advice-ic" style="background:var(--accent-soft);color:var(--accent)"><i class="fa-solid fa-mobile-screen"></i></div>
           <div style="flex:1">
             <div style="font-size:14px;font-weight:800">로컬 보관</div>
-            <div class="muted" style="font-size:12px;font-weight:600">일기 14편 · 이 기기에 저장됨</div>
+            <div class="muted" id="backup-local-desc" style="font-size:12px;font-weight:600">일기 0편 · 이 기기에 저장됨</div>
           </div>
           <span class="list-val">정상</span>
         </div>

@@ -147,6 +147,110 @@ function formatTodayLabel() {
   const weekdays = ["일", "월", "화", "수", "목", "금", "토"];
   return `${now.getMonth() + 1}월 ${now.getDate()}일 ${weekdays[now.getDay()]}요일`;
 }
+function toDateKey(date) {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+function getMondayWeekDates(reference = new Date()) {
+  const base = new Date(reference);
+  base.setHours(0, 0, 0, 0);
+  const day = base.getDay();
+  const diffToMonday = day === 0 ? -6 : 1 - day;
+  const monday = new Date(base);
+  monday.setDate(base.getDate() + diffToMonday);
+  return Array.from({ length: 7 }, (_, i) => {
+    const next = new Date(monday);
+    next.setDate(monday.getDate() + i);
+    return next;
+  });
+}
+function moodToEmoji(mood) {
+  if (!mood) return "📝";
+  const text = String(mood).trim();
+  const emoji = text.match(/^[\p{Extended_Pictographic}\u2600-\u27BF]/u);
+  if (emoji) return emoji[0];
+  const map = { 행복: "😊", 평온: "😌", 설렘: "🥰", 차분: "😐", 지침: "😩" };
+  for (const [key, value] of Object.entries(map)) {
+    if (text.includes(key)) return value;
+  }
+  return "📝";
+}
+function computeWritingStreak(records) {
+  const dates = new Set(
+    records.map((r) => r.createdAt?.slice(0, 10)).filter(Boolean)
+  );
+  if (!dates.size) return 0;
+  let streak = 0;
+  const cursor = new Date();
+  cursor.setHours(0, 0, 0, 0);
+  while (dates.has(toDateKey(cursor))) {
+    streak += 1;
+    cursor.setDate(cursor.getDate() - 1);
+  }
+  return streak;
+}
+function updateHomeWeekDiary() {
+  const summaryEl = document.getElementById("home-week-summary");
+  const strip = document.getElementById("home-weekstrip");
+  if (!strip) return;
+  const weekDates = getMondayWeekDates(new Date());
+  const todayKey = toDateKey(new Date());
+  const labels = ["월", "화", "수", "목", "금", "토", "일"];
+  const byDate = {};
+  for (const record of state.records) {
+    const key = record.createdAt?.slice(0, 10);
+    if (!key) continue;
+    if (!byDate[key] || record.createdAt > byDate[key].createdAt) byDate[key] = record;
+  }
+  const dayEls = strip.querySelectorAll(".day");
+  weekDates.forEach((date, index) => {
+    const dayEl = dayEls[index];
+    if (!dayEl) return;
+    const key = toDateKey(date);
+    const record = byDate[key];
+    const isToday = key === todayKey;
+    const lbl = dayEl.querySelector(".lbl");
+    const dot = dayEl.querySelector(".dot");
+    dayEl.classList.toggle("today", isToday);
+    if (lbl) lbl.textContent = labels[index];
+    if (!dot) return;
+    if (record) {
+      dot.textContent = moodToEmoji(record.mood);
+      dot.style.opacity = "1";
+    } else if (isToday) {
+      dot.textContent = "＋";
+      dot.style.opacity = "1";
+    } else {
+      dot.textContent = "";
+      dot.style.opacity = "0.35";
+    }
+  });
+  const weekKeys = new Set(weekDates.map(toDateKey));
+  const daysWritten = new Set(
+    state.records
+      .map((r) => r.createdAt?.slice(0, 10))
+      .filter((key) => key && weekKeys.has(key))
+  ).size;
+  const streak = computeWritingStreak(state.records);
+  if (!summaryEl) return;
+  if (state.records.length === 0) {
+    summaryEl.textContent = "아직 기록이 없어요";
+    return;
+  }
+  summaryEl.textContent = `${daysWritten}일 기록 · ${streak}일 연속${streak >= 3 ? " 🔥" : ""}`;
+}
+function updateBackupStats() {
+  const el = document.getElementById("backup-local-desc");
+  if (!el) return;
+  const count = state.records.length;
+  el.textContent = `일기 ${count}편 · 이 기기에 저장됨`;
+}
+function updateDiaryStatsUI() {
+  updateHomeWeekDiary();
+  updateBackupStats();
+}
 function updateUserUI() {
   const name = getDisplayName();
   const greeting = getGreeting();
@@ -157,6 +261,15 @@ function updateUserUI() {
   if (el("settings-email")) el("settings-email").textContent = state.auth?.email || state.profile?.email || "로그인이 필요해요";
   if (el("settings-avatar")) el("settings-avatar").textContent = name.slice(0, 1);
   if (el("diary-date-label")) el("diary-date-label").textContent = formatTodayLabel();
+  updateDiaryStatsUI();
+}
+function openManualDiary() {
+  const title = document.getElementById("manual-title");
+  const body = document.getElementById("manual-body");
+  if (title) title.value = "";
+  if (body) body.value = "";
+  state.selectedPrompt = "";
+  go("manual");
 }
 function buildDiaryCorpus(records) {
   return records.map((r) => `${r.title} ${r.body} ${r.summary || ""} ${r.mood}`).join(" ").toLowerCase();
@@ -312,6 +425,7 @@ function go(id) {
     updateUserUI();
     renderFortuneUI();
   }
+  if (id === "backup") updateBackupStats();
   if (id === "admin") loadAdminDashboard();
 }
 function applyTheme(t) { document.documentElement.setAttribute("data-theme", t); document.getElementById("theme-btn").innerHTML = t === "dark" ? '<i class="fa-solid fa-sun"></i>' : '<i class="fa-solid fa-moon"></i>'; const darkSwitch = document.getElementById("dark-switch"); if (darkSwitch) darkSwitch.classList.toggle("on", t === "dark"); localStorage.setItem("handam-theme", t); }
@@ -451,7 +565,14 @@ async function refreshPrompts() {
   await animatePromptRefresh(() => renderPromptRecommendations());
   showToast("새 글감을 골랐어요");
 }
-function startPromptDiary(card) { const title = card.querySelector("h3").textContent; state.selectedPrompt = title; document.getElementById("manual-title").value = title; document.getElementById("manual-body").value = ""; showToast(`글감 "${title}"으로 직접 입력 화면을 열었어요.`); go("manual"); }
+function startPromptDiary(card) {
+  const title = card.querySelector("h3").textContent;
+  state.selectedPrompt = title;
+  document.getElementById("manual-title").value = title;
+  document.getElementById("manual-body").value = "";
+  showToast(`글감 "${title}"으로 직접 입력 화면을 열었어요.`);
+  go("manual");
+}
 
 function createRecordRow(record) {
   const row = document.createElement("div");
@@ -477,7 +598,13 @@ function renderRecordsPage() {
   rows.slice(0, 200).forEach((record) => box.appendChild(createRecordRow(record)));
   refreshInteractions();
 }
-async function reloadRecords() { state.records = await callWorker("list"); renderHomeRecords(); renderRecordsPage(); renderPromptRecommendations(); }
+async function reloadRecords() {
+  state.records = await callWorker("list");
+  renderHomeRecords();
+  renderRecordsPage();
+  renderPromptRecommendations();
+  updateDiaryStatsUI();
+}
 async function deleteCurrentRecord() { if (!state.selectedRecordId) return; const result = await callWorker("delete", { id: state.selectedRecordId }); persistSerialized(result); state.selectedRecordId = null; await reloadRecords(); showToast("기록을 삭제했어요."); go("records"); }
 
 async function loginAsAdmin(username, password) {
@@ -1137,7 +1264,7 @@ function bindSegmentButtons() {
 window.deleteCurrentRecord = deleteCurrentRecord;
 window.go = go; window.toggleTheme = toggleTheme; window.toggleSwitch = toggleSwitch;
 window.openCameraOCR = openCameraOCR; window.openGalleryOCR = openGalleryOCR; window.resetOCR = resetOCR; window.saveDiary = saveDiary;
-window.refreshPrompts = refreshPrompts; window.startPromptDiary = startPromptDiary; window.saveManualDiary = saveManualDiary;
+window.refreshPrompts = refreshPrompts; window.startPromptDiary = startPromptDiary; window.openManualDiary = openManualDiary; window.saveManualDiary = saveManualDiary;
 window.updateFortuneFromBirthday = updateFortuneFromBirthday; window.logout = logout; window.login = login;
 window.loginWithGoogle = loginWithGoogle;
 window.registerFromSignup = registerFromSignup;
