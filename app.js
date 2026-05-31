@@ -341,17 +341,21 @@ function toDateKey(date) {
   const d = String(date.getDate()).padStart(2, "0");
   return `${y}-${m}-${d}`;
 }
-/** 오늘 포함 최근 7일 (어제 기록이 월요일 넘어가도 슬롯에 유지) */
-function getRecentWeekDates(reference = new Date()) {
-  const end = new Date(reference);
-  end.setHours(0, 0, 0, 0);
+/** 이번 주 월요일~일요일 (슬롯 순서 = 월·화·수·목·금·토·일) */
+function getMondayWeekDates(reference = new Date()) {
+  const base = new Date(reference);
+  base.setHours(0, 0, 0, 0);
+  const day = base.getDay();
+  const diffToMonday = day === 0 ? -6 : 1 - day;
+  const monday = new Date(base);
+  monday.setDate(base.getDate() + diffToMonday);
   return Array.from({ length: 7 }, (_, i) => {
-    const day = new Date(end);
-    day.setDate(end.getDate() - (6 - i));
-    return day;
+    const next = new Date(monday);
+    next.setDate(monday.getDate() + i);
+    return next;
   });
 }
-const WEEKDAY_LABELS = ["일", "월", "화", "수", "목", "금", "토"];
+const WEEK_STRIP_LABELS = ["월", "화", "수", "목", "금", "토", "일"];
 let lastHomeDiaryDateKey = diaryEntryDate();
 function moodToEmoji(mood) {
   const emotion = getEmotionById(mood);
@@ -398,7 +402,7 @@ function updateHomeWeekDiary() {
   const strip = document.getElementById("home-weekstrip");
   if (!strip) return;
   bindHomeWeekStrip();
-  const weekDates = getRecentWeekDates(new Date());
+  const weekDates = getMondayWeekDates(new Date());
   const todayKey = diaryEntryDate();
   const byDate = {};
   for (const record of state.records) {
@@ -416,7 +420,7 @@ function updateHomeWeekDiary() {
     const lbl = dayEl.querySelector(".lbl");
     const dot = dayEl.querySelector(".dot");
     dayEl.classList.toggle("today", isToday);
-    if (lbl) lbl.textContent = WEEKDAY_LABELS[date.getDay()];
+    if (lbl) lbl.textContent = WEEK_STRIP_LABELS[index];
     if (!dot) return;
     dot.classList.remove("dot-add");
     dot.removeAttribute("title");
