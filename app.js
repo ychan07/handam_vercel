@@ -227,10 +227,17 @@ function loadEmotionsFromJson(json) {
 function getPromptMoodKeys() {
   return emotionOptions.map((e) => e.id).filter((id) => id !== "default" && promptByMood[id]);
 }
+const LEADING_EMOJI_RE =
+  /^(\p{Extended_Pictographic}(?:\uFE0F|\u200D\p{Extended_Pictographic})*)\s*/u;
 function parseMoodLabel(mood) {
   const text = String(mood || "").trim();
-  const stripped = text.replace(/^[\p{Extended_Pictographic}\u2600-\u27BF]+\s*/u, "").trim();
+  const stripped = text.replace(LEADING_EMOJI_RE, "").trim();
   return stripped || text;
+}
+function extractLeadingEmoji(mood) {
+  const text = String(mood || "").trim();
+  const match = text.match(LEADING_EMOJI_RE);
+  return match ? match[1] : null;
 }
 function getEmotionById(id) {
   const key = parseMoodLabel(id);
@@ -341,28 +348,30 @@ function toDateKey(date) {
   const d = String(date.getDate()).padStart(2, "0");
   return `${y}-${m}-${d}`;
 }
-/** 이번 주 월요일~일요일 (슬롯 순서 = 월·화·수·목·금·토·일) */
-function getMondayWeekDates(reference = new Date()) {
-  const base = new Date(reference);
-  base.setHours(0, 0, 0, 0);
-  const day = base.getDay();
-  const diffToMonday = day === 0 ? -6 : 1 - day;
-  const monday = new Date(base);
-  monday.setDate(base.getDate() + diffToMonday);
-  return Array.from({ length: 7 }, (_, i) => {
-    const next = new Date(monday);
-    next.setDate(monday.getDate() + i);
-    return next;
+/** 오늘 포함 최근 7일, 표시 순서는 월→일(각 칸 요일 라벨과 날짜 일치) */
+function getWeekStripDates(reference = new Date()) {
+  const end = new Date(reference);
+  end.setHours(0, 0, 0, 0);
+  const dates = Array.from({ length: 7 }, (_, i) => {
+    const day = new Date(end);
+    day.setDate(end.getDate() - (6 - i));
+    return day;
   });
+  dates.sort((a, b) => {
+    const wa = a.getDay() === 0 ? 7 : a.getDay();
+    const wb = b.getDay() === 0 ? 7 : b.getDay();
+    return wa - wb;
+  });
+  return dates;
 }
 const WEEK_STRIP_LABELS = ["월", "화", "수", "목", "금", "토", "일"];
 let lastHomeDiaryDateKey = diaryEntryDate();
 function moodToEmoji(mood) {
   const emotion = getEmotionById(mood);
-  if (emotion) return emotion.emoji;
-  const text = String(mood || "").trim();
-  const emoji = text.match(/^[\p{Extended_Pictographic}\u2600-\u27BF]/u);
-  return emoji ? emoji[0] : "📝";
+  if (emotion?.emoji) return emotion.emoji;
+  const leading = extractLeadingEmoji(mood);
+  if (leading) return leading;
+  return "📝";
 }
 function computeWritingStreak(records) {
   const dates = new Set(records.map(recordDateKey).filter(Boolean));
@@ -402,7 +411,7 @@ function updateHomeWeekDiary() {
   const strip = document.getElementById("home-weekstrip");
   if (!strip) return;
   bindHomeWeekStrip();
-  const weekDates = getMondayWeekDates(new Date());
+  const weekDates = getWeekStripDates(new Date());
   const todayKey = diaryEntryDate();
   const byDate = {};
   for (const record of state.records) {
