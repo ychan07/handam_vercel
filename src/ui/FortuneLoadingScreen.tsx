@@ -4,7 +4,7 @@ import Aurora from "@/components/Aurora";
 import BlurText from "@/components/BlurText";
 import ShinyText from "@/components/ShinyText";
 import RotatingText from "@/components/RotatingText";
-import BigDipperConstellation from "./BigDipperConstellation";
+import ZodiacConstellation from "./ZodiacConstellation";
 
 export type FortuneLoadingAnimConfig = {
   minMs?: number;
@@ -155,12 +155,13 @@ export default function FortuneLoadingScreen({
           <div className="fortune-loading-vignette" aria-hidden />
           <div className="fortune-loading-content">
             <motion.div
+              key={westernZodiac}
               className="fortune-loading-constellation-wrap"
               initial={{ scale: 0.88, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               transition={{ duration: cfg.symbolDurationS, ease: [0.22, 1, 0.36, 1] }}
             >
-              <BigDipperConstellation
+              <ZodiacConstellation
                 westernZodiac={westernZodiac}
                 lineDrawDurationS={cfg.constellationLineDrawS ?? cfg.symbolDurationS * 1.9}
                 twinkleDurationS={cfg.symbolPulseDurationS}

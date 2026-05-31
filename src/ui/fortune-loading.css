@@ -37,7 +37,7 @@
   max-width: 340px;
 }
 
-/* ── 북두칠성 영역 ── */
+/* ── 별자리 실루엣 (12궁별 패턴) ── */
 .fortune-loading-constellation-wrap {
   width: min(220px, 58vw);
   height: min(220px, 58vw);
@@ -46,14 +46,14 @@
   justify-content: center;
 }
 
-.big-dipper {
+.zodiac-const {
   position: relative;
   width: 100%;
   height: 100%;
   aspect-ratio: 1;
 }
 
-.big-dipper__nebula {
+.zodiac-const__nebula {
   position: absolute;
   inset: 8%;
   border-radius: 50%;
@@ -61,10 +61,10 @@
     radial-gradient(circle at 42% 38%, rgba(255, 248, 240, 0.12) 0%, transparent 42%),
     radial-gradient(circle at 58% 62%, rgba(212, 122, 66, 0.14) 0%, transparent 48%),
     radial-gradient(circle at 50% 50%, rgba(18, 14, 12, 0.4) 0%, transparent 70%);
-  animation: dipper-nebula-breathe var(--dipper-twinkle, 2.4s) ease-in-out infinite;
+  animation: zodiac-nebula-breathe var(--zodiac-twinkle, 2.4s) ease-in-out infinite;
 }
 
-.big-dipper__ring {
+.zodiac-const__ring {
   position: absolute;
   inset: 4%;
   border-radius: 50%;
@@ -75,7 +75,7 @@
     0 0 80px -20px rgba(212, 122, 66, 0.15);
 }
 
-.big-dipper__ring::after {
+.zodiac-const__ring::after {
   content: "";
   position: absolute;
   inset: 12%;
@@ -83,43 +83,43 @@
   border: 1px solid rgba(255, 255, 255, 0.04);
 }
 
-.big-dipper__dust {
+.zodiac-const__dust {
   position: absolute;
   inset: 0;
   pointer-events: none;
 }
 
-.big-dipper__speck {
+.zodiac-const__speck {
   position: absolute;
   width: 2px;
   height: 2px;
   border-radius: 50%;
   background: rgba(255, 248, 240, 0.35);
   opacity: 0;
-  animation: dipper-speck-twinkle calc(var(--dipper-twinkle, 2.4s) * 1.4) ease-in-out infinite;
+  animation: zodiac-speck-twinkle calc(var(--zodiac-twinkle, 2.4s) * 1.4) ease-in-out infinite;
   animation-delay: calc(var(--i) * 0.21s);
 }
 
-.big-dipper__speck:nth-child(1) { left: 12%; top: 18%; }
-.big-dipper__speck:nth-child(2) { left: 28%; top: 8%; }
-.big-dipper__speck:nth-child(3) { left: 82%; top: 14%; }
-.big-dipper__speck:nth-child(4) { left: 92%; top: 32%; }
-.big-dipper__speck:nth-child(5) { left: 6%; top: 48%; }
-.big-dipper__speck:nth-child(6) { left: 48%; top: 6%; }
-.big-dipper__speck:nth-child(7) { left: 68%; top: 92%; }
-.big-dipper__speck:nth-child(8) { left: 38%; top: 78%; }
-.big-dipper__speck:nth-child(9) { left: 88%; top: 68%; }
-.big-dipper__speck:nth-child(10) { left: 18%; top: 72%; }
-.big-dipper__speck:nth-child(11) { left: 54%; top: 88%; }
-.big-dipper__speck:nth-child(12) { left: 76%; top: 52%; }
-.big-dipper__speck:nth-child(13) { left: 32%; top: 28%; }
-.big-dipper__speck:nth-child(14) { left: 58%; top: 22%; }
-.big-dipper__speck:nth-child(15) { left: 44%; top: 62%; }
-.big-dipper__speck:nth-child(16) { left: 8%; top: 32%; }
-.big-dipper__speck:nth-child(17) { left: 94%; top: 48%; }
-.big-dipper__speck:nth-child(18) { left: 62%; top: 8%; }
+.zodiac-const__speck:nth-child(1) { left: 12%; top: 18%; }
+.zodiac-const__speck:nth-child(2) { left: 28%; top: 8%; }
+.zodiac-const__speck:nth-child(3) { left: 82%; top: 14%; }
+.zodiac-const__speck:nth-child(4) { left: 92%; top: 32%; }
+.zodiac-const__speck:nth-child(5) { left: 6%; top: 48%; }
+.zodiac-const__speck:nth-child(6) { left: 48%; top: 6%; }
+.zodiac-const__speck:nth-child(7) { left: 68%; top: 92%; }
+.zodiac-const__speck:nth-child(8) { left: 38%; top: 78%; }
+.zodiac-const__speck:nth-child(9) { left: 88%; top: 68%; }
+.zodiac-const__speck:nth-child(10) { left: 18%; top: 72%; }
+.zodiac-const__speck:nth-child(11) { left: 54%; top: 88%; }
+.zodiac-const__speck:nth-child(12) { left: 76%; top: 52%; }
+.zodiac-const__speck:nth-child(13) { left: 32%; top: 28%; }
+.zodiac-const__speck:nth-child(14) { left: 58%; top: 22%; }
+.zodiac-const__speck:nth-child(15) { left: 44%; top: 62%; }
+.zodiac-const__speck:nth-child(16) { left: 8%; top: 32%; }
+.zodiac-const__speck:nth-child(17) { left: 94%; top: 48%; }
+.zodiac-const__speck:nth-child(18) { left: 62%; top: 8%; }
 
-.big-dipper__svg {
+.zodiac-const__svg {
   position: absolute;
   inset: 14%;
   width: 72%;
@@ -132,14 +132,14 @@
   overflow: visible;
 }
 
-.big-dipper__path {
+.zodiac-const__path {
   fill: none;
-  stroke-dasharray: 320;
-  stroke-dashoffset: 320;
-  animation: dipper-line-draw var(--dipper-line-draw, 1.65s) cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  stroke-dasharray: var(--zodiac-path-length, 220);
+  stroke-dashoffset: var(--zodiac-path-length, 220);
+  animation: zodiac-line-draw var(--zodiac-line-draw, 1.65s) cubic-bezier(0.22, 1, 0.36, 1) forwards;
 }
 
-.big-dipper__stars {
+.zodiac-const__stars {
   position: absolute;
   inset: 14%;
   width: 72%;
@@ -151,7 +151,7 @@
   bottom: 0;
 }
 
-.big-dipper__star {
+.zodiac-const__star {
   position: absolute;
   width: var(--star-size, 4px);
   height: var(--star-size, 4px);
@@ -171,12 +171,12 @@
     0 0 6px 1px rgba(255, 248, 240, 0.7),
     0 0 14px 3px rgba(240, 185, 106, 0.35);
   animation:
-    dipper-star-in 0.55s cubic-bezier(0.22, 1, 0.36, 1) forwards,
-    dipper-star-twinkle var(--dipper-twinkle, 2.4s) ease-in-out infinite;
+    zodiac-star-in 0.55s cubic-bezier(0.22, 1, 0.36, 1) forwards,
+    zodiac-star-twinkle var(--zodiac-twinkle, 2.4s) ease-in-out infinite;
   animation-delay: var(--star-delay, 0s), calc(var(--star-delay, 0s) + 0.55s);
 }
 
-.big-dipper__star::before {
+.zodiac-const__star::before {
   content: "";
   position: absolute;
   left: 50%;
@@ -186,11 +186,11 @@
   margin: -90% 0 0 -90%;
   border-radius: 50%;
   background: radial-gradient(circle, rgba(255, 248, 240, 0.25) 0%, transparent 70%);
-  animation: dipper-halo-pulse var(--dipper-twinkle, 2.4s) ease-in-out infinite;
+  animation: zodiac-halo-pulse var(--zodiac-twinkle, 2.4s) ease-in-out infinite;
   animation-delay: calc(var(--star-delay, 0s) + 0.3s);
 }
 
-.big-dipper__star::after {
+.zodiac-const__star::after {
   content: "";
   position: absolute;
   left: 50%;
@@ -209,11 +209,11 @@
   );
   transform: rotate(-28deg) scaleX(0);
   opacity: 0.7;
-  animation: dipper-flare var(--dipper-twinkle, 2.4s) ease-in-out infinite;
+  animation: zodiac-flare var(--zodiac-twinkle, 2.4s) ease-in-out infinite;
   animation-delay: calc(var(--star-delay, 0s) + 0.8s);
 }
 
-.big-dipper__star.is-accent {
+.zodiac-const__star.is-accent {
   --star-size: 7px;
   z-index: 2;
   box-shadow:
@@ -222,7 +222,7 @@
     0 0 36px 10px rgba(212, 122, 66, 0.25);
 }
 
-.big-dipper__star.is-accent::after {
+.zodiac-const__star.is-accent::after {
   width: 420%;
   margin-left: -210%;
 }
@@ -297,20 +297,20 @@
   backface-visibility: hidden;
 }
 
-@keyframes dipper-line-draw {
+@keyframes zodiac-line-draw {
   to {
     stroke-dashoffset: 0;
   }
 }
 
-@keyframes dipper-star-in {
+@keyframes zodiac-star-in {
   to {
     opacity: 1;
     transform: scale(1);
   }
 }
 
-@keyframes dipper-star-twinkle {
+@keyframes zodiac-star-twinkle {
   0%,
   100% {
     opacity: 0.82;
@@ -322,7 +322,7 @@
   }
 }
 
-@keyframes dipper-halo-pulse {
+@keyframes zodiac-halo-pulse {
   0%,
   100% {
     transform: scale(0.9);
@@ -334,7 +334,7 @@
   }
 }
 
-@keyframes dipper-flare {
+@keyframes zodiac-flare {
   0%,
   100% {
     transform: rotate(-28deg) scaleX(0.3);
@@ -346,7 +346,7 @@
   }
 }
 
-@keyframes dipper-nebula-breathe {
+@keyframes zodiac-nebula-breathe {
   0%,
   100% {
     opacity: 0.85;
@@ -358,7 +358,7 @@
   }
 }
 
-@keyframes dipper-speck-twinkle {
+@keyframes zodiac-speck-twinkle {
   0%,
   100% {
     opacity: 0.15;
