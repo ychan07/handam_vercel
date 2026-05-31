@@ -12,7 +12,7 @@ function exportedBinaryArray() {
 function listRows() {
   const rows = [];
   const result = db.exec(
-    "SELECT id, title, body, mood, summary, createdAt FROM diaries ORDER BY createdAt DESC"
+    "SELECT id, title, body, mood, summary, createdAt, entryDate FROM diaries ORDER BY createdAt DESC"
   );
   if (!result[0]) return rows;
   const columns = result[0].columns;
@@ -44,9 +44,15 @@ async function setup() {
       body TEXT NOT NULL,
       mood TEXT NOT NULL,
       summary TEXT,
-      createdAt TEXT NOT NULL
+      createdAt TEXT NOT NULL,
+      entryDate TEXT
     );
   `);
+  try {
+    db.run("ALTER TABLE diaries ADD COLUMN entryDate TEXT");
+  } catch (_e) {
+    /* column already exists */
+  }
 }
 
 self.onmessage = async (event) => {
@@ -61,9 +67,19 @@ self.onmessage = async (event) => {
     if (!db) throw new Error("DB not initialized");
 
     if (type === "insert") {
+      const entryDate =
+        payload.entryDate ||
+        (typeof payload.createdAt === "string" ? payload.createdAt.slice(0, 10) : "");
       db.run(
-        "INSERT INTO diaries (title, body, mood, summary, createdAt) VALUES (?, ?, ?, ?, ?)",
-        [payload.title, payload.body, payload.mood, payload.summary || "", payload.createdAt]
+        "INSERT INTO diaries (title, body, mood, summary, createdAt, entryDate) VALUES (?, ?, ?, ?, ?, ?)",
+        [
+          payload.title,
+          payload.body,
+          payload.mood,
+          payload.summary || "",
+          payload.createdAt,
+          entryDate,
+        ]
       );
       self.postMessage({ id, data: { ok: true, serialized: exportedBinaryArray() } });
       return;

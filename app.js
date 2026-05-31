@@ -248,8 +248,12 @@ function moodMatchesFilter(recordMood, filterId) {
   return parseMoodLabel(recordMood) === filterId;
 }
 function recordDateKey(record) {
+  if (record?.entryDate) return String(record.entryDate).slice(0, 10);
   if (!record?.createdAt) return "";
   return toDateKey(new Date(record.createdAt));
+}
+function diaryEntryDate(reference = new Date()) {
+  return toDateKey(reference);
 }
 function renderEmotionPickers() {
   if (!emotionOptions.length) return;
@@ -337,19 +341,18 @@ function toDateKey(date) {
   const d = String(date.getDate()).padStart(2, "0");
   return `${y}-${m}-${d}`;
 }
-function getMondayWeekDates(reference = new Date()) {
-  const base = new Date(reference);
-  base.setHours(0, 0, 0, 0);
-  const day = base.getDay();
-  const diffToMonday = day === 0 ? -6 : 1 - day;
-  const monday = new Date(base);
-  monday.setDate(base.getDate() + diffToMonday);
+/** 오늘 포함 최근 7일 (어제 기록이 월요일 넘어가도 슬롯에 유지) */
+function getRecentWeekDates(reference = new Date()) {
+  const end = new Date(reference);
+  end.setHours(0, 0, 0, 0);
   return Array.from({ length: 7 }, (_, i) => {
-    const next = new Date(monday);
-    next.setDate(monday.getDate() + i);
-    return next;
+    const day = new Date(end);
+    day.setDate(end.getDate() - (6 - i));
+    return day;
   });
 }
+const WEEKDAY_LABELS = ["일", "월", "화", "수", "목", "금", "토"];
+let lastHomeDiaryDateKey = diaryEntryDate();
 function moodToEmoji(mood) {
   const emotion = getEmotionById(mood);
   if (emotion) return emotion.emoji;
@@ -380,14 +383,23 @@ function bindHomeWeekStrip() {
     if (dot?.classList.contains("dot-add")) go("diary");
   });
 }
+function refreshHomeIfDateChanged() {
+  const todayKey = diaryEntryDate();
+  if (todayKey === lastHomeDiaryDateKey) return;
+  lastHomeDiaryDateKey = todayKey;
+  updateUserUI();
+  if (currentPageId() === "fortune" && fortuneData && state.fortuneBirthday) {
+    refreshFortune();
+    renderFortuneUI();
+  }
+}
 function updateHomeWeekDiary() {
   const summaryEl = document.getElementById("home-week-summary");
   const strip = document.getElementById("home-weekstrip");
   if (!strip) return;
   bindHomeWeekStrip();
-  const weekDates = getMondayWeekDates(new Date());
-  const todayKey = toDateKey(new Date());
-  const labels = ["월", "화", "수", "목", "금", "토", "일"];
+  const weekDates = getRecentWeekDates(new Date());
+  const todayKey = diaryEntryDate();
   const byDate = {};
   for (const record of state.records) {
     const key = recordDateKey(record);
@@ -404,7 +416,7 @@ function updateHomeWeekDiary() {
     const lbl = dayEl.querySelector(".lbl");
     const dot = dayEl.querySelector(".dot");
     dayEl.classList.toggle("today", isToday);
-    if (lbl) lbl.textContent = labels[index];
+    if (lbl) lbl.textContent = WEEKDAY_LABELS[date.getDay()];
     if (!dot) return;
     dot.classList.remove("dot-add");
     dot.removeAttribute("title");
@@ -730,6 +742,7 @@ async function saveDiary() {
     summary,
     mood: formatMoodForSave(getSelectedMood("#emo-pick")),
     createdAt: new Date().toISOString(),
+    entryDate: diaryEntryDate(),
   });
   persistSerialized(result); await reloadRecords(); showToast("OCR 일기를 저장했어요."); go("records");
 }
@@ -741,7 +754,14 @@ async function saveManualDiary() {
   const mood = formatMoodForSave(getSelectedMood("#manual-mood"));
   let summary = body;
   try { const ai = await apiPost("/api/llm/summarize", { text: body }); summary = ai.summary || summary; } catch (_error) {}
-  const result = await callWorker("insert", { title, body, mood, summary, createdAt: new Date().toISOString() });
+  const result = await callWorker("insert", {
+    title,
+    body,
+    mood,
+    summary,
+    createdAt: new Date().toISOString(),
+    entryDate: diaryEntryDate(),
+  });
   persistSerialized(result); await reloadRecords(); showToast("직접 입력 일기를 저장했어요."); go("records");
 }
 
@@ -834,6 +854,11 @@ function renderRecordsPage() {
 }
 async function reloadRecords() {
   state.records = await callWorker("list");
+  for (const record of state.records) {
+    if (!record.entryDate && record.createdAt) {
+      record.entryDate = toDateKey(new Date(record.createdAt));
+    }
+  }
   renderHomeRecords();
   renderRecordsPage();
   renderPromptRecommendations();
@@ -1581,7 +1606,13 @@ function bindFindAccountTabs() {
   document.getElementById("ocr-gallery-file").addEventListener("change", (e) => runOCRFile(e.target.files?.[0]));
   document.getElementById("filter-mood").addEventListener("change", renderRecordsPage);
   document.getElementById("filter-date").addEventListener("change", renderRecordsPage);
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible") refreshHomeIfDateChanged();
+  });
+  window.addEventListener("pageshow", refreshHomeIfDateChanged);
+  window.setInterval(refreshHomeIfDateChanged, 60_000);
   await initWorker(); await reloadRecords();
+  lastHomeDiaryDateKey = diaryEntryDate();
   onAuthStateChanged(auth, async (user) => {
     if (!user || state.auth?.isAdmin) return;
     await setAuthFromUser(user);
