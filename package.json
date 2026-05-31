@@ -6,6 +6,7 @@
     "dev": "next dev",
     "build": "node build-static.cjs",
     "build:ui": "vite build",
+    "generate:constellations": "node scripts/generate-zodiac-constellations.mjs",
     "start": "npm run build:ui && node server.cjs",
     "predev": "npm run build:ui",
     "start:next": "next start",
