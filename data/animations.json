@@ -61,10 +61,14 @@
       "exitMs": 520,
       // exitFadeDurationS: 로딩 화면 opacity 0 전환(초)
       "exitFadeDurationS": 0.45,
-      // symbolDurationS: 별자리 기호 원형 마크 등장(초)
+      // symbolDurationS: 북두칠성 영역 페이드인(초)
       "symbolDurationS": 0.85,
-      // symbolPulseDurationS: 기호 링 펄스 루프(초) — --anim-fortune-symbol-pulse
-      "symbolPulseDurationS": 2.4,
+      // symbolPulseDurationS: 별·성운 반짝임 주기(초) — --anim-fortune-symbol-pulse
+      "symbolPulseDurationS": 2.8,
+      // constellationLineDrawS: 북두칠성 연결선 그려지는 시간(초)
+      "constellationLineDrawS": 1.75,
+      // constellationStarStaggerMs: 별 순차 등장 간격(ms)
+      "constellationStarStaggerMs": 75,
       // blurTextDelayMs: 별자리명 BlurText 글자 간 지연(ms)
       "blurTextDelayMs": 70,
       // blurTextStepDurationS: BlurText 각 글자 스텝(초)

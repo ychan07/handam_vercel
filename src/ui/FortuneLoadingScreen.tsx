@@ -4,6 +4,7 @@ import Aurora from "@/components/Aurora";
 import BlurText from "@/components/BlurText";
 import ShinyText from "@/components/ShinyText";
 import RotatingText from "@/components/RotatingText";
+import BigDipperConstellation from "./BigDipperConstellation";
 
 export type FortuneLoadingAnimConfig = {
   minMs?: number;
@@ -13,6 +14,10 @@ export type FortuneLoadingAnimConfig = {
   exitFadeDurationS?: number;
   symbolDurationS?: number;
   symbolPulseDurationS?: number;
+  /** 북두칠성 연결선 드로우(초) */
+  constellationLineDrawS?: number;
+  /** 별 순차 등장 간격(ms) */
+  constellationStarStaggerMs?: number;
   blurTextDelayMs?: number;
   blurTextStepDurationS?: number;
   progressBarDurationS?: number;
@@ -28,21 +33,6 @@ type FortuneLoadingScreenProps = {
   chineseZodiac: string;
   onDone: () => void;
   loadingConfig?: FortuneLoadingAnimConfig;
-};
-
-const ZODIAC_SYMBOL: Record<string, string> = {
-  양자리: "♈",
-  황소자리: "♉",
-  쌍둥이자리: "♊",
-  게자리: "♋",
-  사자자리: "♌",
-  처녀자리: "♍",
-  천칭자리: "♎",
-  전갈자리: "♏",
-  사수자리: "♐",
-  염소자리: "♑",
-  물병자리: "♒",
-  물고기자리: "♓",
 };
 
 const FORTUNE_ROTATING_PHRASES = [
@@ -80,7 +70,9 @@ const FORTUNE_DEFAULTS: Required<
   exitMs: 520,
   exitFadeDurationS: 0.45,
   symbolDurationS: 0.85,
-  symbolPulseDurationS: 2.4,
+  symbolPulseDurationS: 2.8,
+  constellationLineDrawS: 1.75,
+  constellationStarStaggerMs: 75,
   blurTextDelayMs: 70,
   blurTextStepDurationS: 0.38,
   progressBarDurationS: 0.25,
@@ -106,7 +98,6 @@ export default function FortuneLoadingScreen({
   const [phase, setPhase] = useState<"intro" | "exit" | "gone">("intro");
   const [progress, setProgress] = useState(0);
   const [titleDone, setTitleDone] = useState(false);
-  const symbol = ZODIAC_SYMBOL[westernZodiac] ?? "✦";
 
   const finish = useCallback(() => {
     setPhase("exit");
@@ -164,18 +155,17 @@ export default function FortuneLoadingScreen({
           <div className="fortune-loading-vignette" aria-hidden />
           <div className="fortune-loading-content">
             <motion.div
-              className="fortune-loading-symbol"
-              initial={{ scale: 0.5, opacity: 0, rotate: -12 }}
-              animate={{ scale: 1, opacity: 1, rotate: 0 }}
+              className="fortune-loading-constellation-wrap"
+              initial={{ scale: 0.88, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
               transition={{ duration: cfg.symbolDurationS, ease: [0.22, 1, 0.36, 1] }}
             >
-              <span
-                className="fortune-loading-glyph"
-                aria-hidden
-                style={{ animationDuration: `${cfg.symbolPulseDurationS}s` }}
-              >
-                {symbol}
-              </span>
+              <BigDipperConstellation
+                westernZodiac={westernZodiac}
+                lineDrawDurationS={cfg.constellationLineDrawS ?? cfg.symbolDurationS * 1.9}
+                twinkleDurationS={cfg.symbolPulseDurationS}
+                starStaggerMs={cfg.constellationStarStaggerMs ?? 70}
+              />
             </motion.div>
             <div className="fortune-loading-title" role="heading" aria-level={2}>
               <BlurText
