@@ -62,6 +62,23 @@ export const DEFAULT_ANIMATIONS = {
       shinyTextSpeed: 2.8,
       appEnterDurationS: 0.65,
     },
+    fortune: {
+      minMs: 2800,
+      maxMs: 4500,
+      finishDelayMs: 300,
+      exitMs: 520,
+      exitFadeDurationS: 0.45,
+      symbolDurationS: 0.85,
+      symbolPulseDurationS: 2.4,
+      blurTextDelayMs: 70,
+      blurTextStepDurationS: 0.38,
+      progressBarDurationS: 0.25,
+      rotatingIntervalMs: 1600,
+      rotatingStaggerDurationS: 0.025,
+      rotatingSpring: { damping: 24, stiffness: 300 },
+      aurora: { amplitude: 1.05, blend: 0.38, speed: 0.9 },
+      shinyTextSpeed: 3.2,
+    },
     deviceShell: { fadeDurationS: 0.5 },
   },
   reveal: {
@@ -176,6 +193,7 @@ export function applyAnimationCssVars(cfg = getAnimations()) {
   const sheet = cfg.sheet || {};
   const deco = cfg.decorations || {};
   const splash = cfg.loading?.splash || {};
+  const fortuneLoading = cfg.loading?.fortune || {};
   const deviceShell = cfg.loading?.deviceShell || {};
   const fortune = cfg.fortune || {};
 
@@ -197,6 +215,10 @@ export function applyAnimationCssVars(cfg = getAnimations()) {
 
   root.style.setProperty("--anim-device-fade-duration", s(deviceShell.fadeDurationS ?? 0.5));
   root.style.setProperty("--anim-splash-app-enter", s(splash.appEnterDurationS ?? 0.65));
+  root.style.setProperty(
+    "--anim-fortune-symbol-pulse",
+    s(fortuneLoading.symbolPulseDurationS ?? 2.4)
+  );
 
   root.style.setProperty("--anim-fortune-ring", s(fortune.gaugeRingTransitionS ?? 1.55));
   root.style.setProperty("--anim-fortune-bar", s(fortune.adviceBarTransitionS ?? 1.1));

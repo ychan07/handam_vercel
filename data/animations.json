@@ -10,8 +10,8 @@
   // =============================================================================
 
   // -----------------------------------------------------------------------------
-  // loading — 앱 최초 진입 · 스플래시(로딩 화면)
-  // 연동: src/ui/SplashScreen.tsx, src/ui-entry.tsx, src/ui/splash.css
+  // loading — 앱 최초 진입 스플래시 · 운세 계산 로딩
+  // 연동: SplashScreen.tsx, FortuneLoadingScreen.tsx, ui-entry.tsx, fortune-loading-bridge.tsx
   // -----------------------------------------------------------------------------
   "loading": {
     "splash": {
@@ -47,6 +47,40 @@
       "shinyTextSpeed": 2.8,
       // appEnterDurationS: 스플래시 후 메인 .device 등장 애니메이션(초) — splash.css app-enter
       "appEnterDurationS": 0.65
+    },
+    // fortune — 생년월일 입력 후 운세 계산 로딩(별자리 표시)
+    // 연동: src/ui/FortuneLoadingScreen.tsx, src/fortune-loading-bridge.tsx, app.js updateFortuneFromBirthday()
+    "fortune": {
+      // minMs: 별자리 BlurText 완료 후에도 유지할 최소 시간(ms)
+      "minMs": 3200,
+      // maxMs: 강제 종료 상한(ms)
+      "maxMs": 5000,
+      // finishDelayMs: 진행률 100% 후 페이드아웃까지(ms)
+      "finishDelayMs": 300,
+      // exitMs: exit 페이드 후 onDone·DOM 정리까지(ms)
+      "exitMs": 520,
+      // exitFadeDurationS: 로딩 화면 opacity 0 전환(초)
+      "exitFadeDurationS": 0.45,
+      // symbolDurationS: 별자리 기호 원형 마크 등장(초)
+      "symbolDurationS": 0.85,
+      // symbolPulseDurationS: 기호 링 펄스 루프(초) — --anim-fortune-symbol-pulse
+      "symbolPulseDurationS": 2.4,
+      // blurTextDelayMs: 별자리명 BlurText 글자 간 지연(ms)
+      "blurTextDelayMs": 70,
+      // blurTextStepDurationS: BlurText 각 글자 스텝(초)
+      "blurTextStepDurationS": 0.38,
+      // progressBarDurationS: 프로그레스 바 width 보간(초)
+      "progressBarDurationS": 0.25,
+      // rotatingIntervalMs: "○○ 맞추는 중이에요" 앞 문구 교체(ms)
+      "rotatingIntervalMs": 1600,
+      // rotatingStaggerDurationS: RotatingText 글자 stagger(초)
+      "rotatingStaggerDurationS": 0.025,
+      // rotatingSpring: 회전 텍스트 spring
+      "rotatingSpring": { "damping": 24, "stiffness": 300 },
+      // aurora: 배경 Aurora
+      "aurora": { "amplitude": 1.05, "blend": 0.38, "speed": 0.9 },
+      // shinyTextSpeed: 띠·부제 반짝임 속도
+      "shinyTextSpeed": 3.2
     },
     "deviceShell": {
       // fadeDurationS: .device 로딩→표시 시 opacity/transform 전환(초)

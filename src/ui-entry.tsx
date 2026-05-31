@@ -3,6 +3,7 @@ import "./index.css";
 import "./ui/splash.css";
 import SplashScreen from "./ui/SplashScreen";
 import { loadAnimations } from "../animations.js";
+import { initFortuneLoadingBridge } from "./fortune-loading-bridge";
 
 function revealApp(revealDelayMs = 600) {
   const device = document.querySelector(".device");
@@ -15,6 +16,7 @@ function revealApp(revealDelayMs = 600) {
 
 async function bootSplash() {
   const cfg = await loadAnimations();
+  initFortuneLoadingBridge(cfg);
   const splash = cfg.loading?.splash ?? {};
   const revealDelayMs = splash.revealAppDelayMs ?? 600;
 

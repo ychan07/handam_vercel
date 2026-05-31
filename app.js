@@ -1472,6 +1472,26 @@ function fillBirthdaySelects() {
     d.value = "20";
   }
 }
+function completeFortuneCalculation() {
+  refreshFortune();
+  renderFortuneUI();
+  showToast("오늘의 운세를 계산했어요.");
+  setTimeout(animateGauge, getAnimations().fortune?.gaugeInitDelayMs ?? 100);
+}
+function showFortuneCalculatingLoader(birthday, onDone) {
+  const parsed = parseBirthday(birthday);
+  if (!parsed) {
+    onDone();
+    return;
+  }
+  const westernZodiac = getWesternZodiac(parsed.month, parsed.day);
+  const chineseZodiac = getChineseZodiac(parsed.year);
+  if (typeof window.handamFortuneLoading?.show === "function") {
+    window.handamFortuneLoading.show({ westernZodiac, chineseZodiac, onDone });
+    return;
+  }
+  onDone();
+}
 function updateFortuneFromBirthday() {
   const birthday = `${document.getElementById("fortune-year").value}-${document.getElementById("fortune-month").value}-${document.getElementById("fortune-day").value}`;
   if (!parseBirthday(birthday)) {
@@ -1479,11 +1499,8 @@ function updateFortuneFromBirthday() {
     return;
   }
   saveFortuneBirthday(birthday);
-  refreshFortune();
   closeSheet();
-  renderFortuneUI();
-  showToast("오늘의 운세를 계산했어요.");
-  setTimeout(animateGauge, getAnimations().fortune?.gaugeInitDelayMs ?? 100);
+  showFortuneCalculatingLoader(birthday, completeFortuneCalculation);
 }
 function initFortune() {
   state.fortuneBirthday = loadFortuneBirthday();
