@@ -124,11 +124,14 @@ function collectNeededHips(iau, zodiacEnglish) {
   return needed;
 }
 
-function gnomonicProject(stars, viewSize = 200, pad = 16) {
+/** 가로(적경) 방향 별 간격 — 1보다 크면 별자리가 가로로 넓어짐 (UI 크기는 그대로) */
+const HORIZONTAL_STRETCH = 2.05;
+
+function gnomonicProject(stars, viewSize = 200, pad = 14, stretchX = HORIZONTAL_STRETCH) {
   const raRad = stars.map((s) => (s.ra * Math.PI) / 180);
   const decRad = stars.map((s) => (s.dec * Math.PI) / 180);
-  let ra0 = raRad.reduce((a, b) => a + b, 0) / raRad.length;
-  let dec0 = decRad.reduce((a, b) => a + b, 0) / decRad.length;
+  const ra0 = raRad.reduce((a, b) => a + b, 0) / raRad.length;
+  const dec0 = decRad.reduce((a, b) => a + b, 0) / decRad.length;
 
   const projected = stars.map((s, i) => {
     const ra = raRad[i];
@@ -145,14 +148,15 @@ function gnomonicProject(stars, viewSize = 200, pad = 16) {
   const maxX = Math.max(...xs);
   const minY = Math.min(...ys);
   const maxY = Math.max(...ys);
-  const span = Math.max(maxX - minX, maxY - minY, 1e-6);
-  const scale = (viewSize - pad * 2) / span;
+  const spanY = Math.max(maxY - minY, 1e-6);
+  const scaleY = (viewSize - pad * 2) / spanY;
+  const scaleX = scaleY * stretchX;
   const cx = (minX + maxX) / 2;
   const cy = (minY + maxY) / 2;
 
   return projected.map((p) => ({
-    vx: (p.x - cx) * scale + viewSize / 2,
-    vy: -(p.y - cy) * scale + viewSize / 2,
+    vx: (p.x - cx) * scaleX + viewSize / 2,
+    vy: -(p.y - cy) * scaleY + viewSize / 2,
     mag: p.mag,
     hip: p.hip,
   }));
@@ -248,8 +252,8 @@ async function main() {
   for (const [ko, en] of Object.entries(ZODIAC_IAU)) {
     const polylines = iau[en];
     if (!polylines?.length) throw new Error(`No IAU lines for ${en}`);
-    result[ko] = buildConstellation(polylines, hipMap);
-    console.log(`  ${ko} (${en}): ${result[ko].stars.length} stars, path ${result[ko].pathLength}`);
+    result[en] = buildConstellation(polylines, hipMap);
+    console.log(`  ${ko} (${en}): ${result[en].stars.length} stars, path ${result[en].pathLength}`);
   }
 
   const outPath = path.join(ROOT, "src", "ui", "zodiac-constellations.generated.ts");
@@ -268,7 +272,7 @@ export type GeneratedZodiacConstellationArt = {
   accentIndex: number;
 };
 
-export const ZODIAC_CONSTELLATIONS_GENERATED: Record<string, GeneratedZodiacConstellationArt> = ${JSON.stringify(result, null, 2)};
+export const ZODIAC_CONSTELLATIONS_BY_IAU: Record<string, GeneratedZodiacConstellationArt> = ${JSON.stringify(result, null, 2)};
 `;
 
   fs.writeFileSync(outPath, body, "utf8");

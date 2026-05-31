@@ -21,12 +21,14 @@ export default function ZodiacConstellation({
   const uid = useId().replace(/:/g, "");
   const gradId = `zodiac-line-grad-${uid}`;
   const glowId = `zodiac-line-glow-${uid}`;
-  const { stars, pathD, pathLength, accentIndex } = getZodiacConstellation(westernZodiac);
+  const zodiacKey = westernZodiac.trim();
+  const { stars, pathD, pathLength, accentIndex } = getZodiacConstellation(zodiacKey);
 
   return (
     <div
+      key={zodiacKey}
       className="zodiac-const"
-      data-zodiac={westernZodiac}
+      data-zodiac={zodiacKey}
       style={
         {
           "--zodiac-line-draw": `${lineDrawDurationS}s`,
@@ -61,6 +63,7 @@ export default function ZodiacConstellation({
           </filter>
         </defs>
         <path
+          key={pathD}
           className="zodiac-const__path"
           d={pathD}
           stroke={`url(#${gradId})`}

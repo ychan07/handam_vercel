@@ -35,13 +35,17 @@ export function initFortuneLoadingBridge(cfg: AnimConfig) {
         return;
       }
 
+      const zodiac = String(westernZodiac ?? "").trim();
+      const chinese = String(chineseZodiac ?? "").trim();
+
       teardownFortuneMount(mount);
       document.body.classList.add("is-fortune-loading-active");
       fortuneRoot = createRoot(mount);
       fortuneRoot.render(
         <FortuneLoadingScreen
-          westernZodiac={westernZodiac}
-          chineseZodiac={chineseZodiac}
+          key={zodiac}
+          westernZodiac={zodiac}
+          chineseZodiac={chinese}
           loadingConfig={animConfig?.loading?.fortune}
           onDone={() => {
             teardownFortuneMount(mount);

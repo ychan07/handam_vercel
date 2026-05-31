@@ -1487,7 +1487,11 @@ function showFortuneCalculatingLoader(birthday, onDone) {
   const westernZodiac = getWesternZodiac(parsed.month, parsed.day);
   const chineseZodiac = getChineseZodiac(parsed.year);
   if (typeof window.handamFortuneLoading?.show === "function") {
-    window.handamFortuneLoading.show({ westernZodiac, chineseZodiac, onDone });
+    window.handamFortuneLoading.show({
+      westernZodiac: String(westernZodiac),
+      chineseZodiac: String(chineseZodiac),
+      onDone,
+    });
     return;
   }
   onDone();
