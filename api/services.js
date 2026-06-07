@@ -9,29 +9,63 @@ function getAction(req, body) {
   }
 }
 
+function fieldSortKey(field) {
+  const vertices = field?.boundingPoly?.vertices;
+  if (!Array.isArray(vertices) || !vertices.length) return [0, 0];
+  const ys = vertices.map((v) => Number(v?.y) || 0);
+  const xs = vertices.map((v) => Number(v?.x) || 0);
+  return [Math.min(...ys), Math.min(...xs)];
+}
+
+function extractOcrText(data) {
+  const fields = (data?.images?.[0]?.fields || []).filter((f) => f?.inferText);
+  fields.sort((a, b) => {
+    const [ay, ax] = fieldSortKey(a);
+    const [by, bx] = fieldSortKey(b);
+    if (ay !== by) return ay - by;
+    return ax - bx;
+  });
+  const lines = [];
+  let current = "";
+  for (const field of fields) {
+    const piece = String(field.inferText).trim();
+    if (!piece) continue;
+    if (field.lineBreak && current) {
+      lines.push(current);
+      current = piece;
+    } else {
+      current = current ? `${current} ${piece}` : piece;
+    }
+  }
+  if (current) lines.push(current);
+  return lines.join("\n").trim();
+}
+
 async function handleOcr(res, body) {
-  const { imageBase64 } = body;
+  const { imageBase64, format: formatHint } = body;
   if (!imageBase64) return sendJson(res, 400, { error: "imageBase64 is required" });
   const invokeUrl = process.env.CLOVA_OCR_INVOKE_URL;
   const secret = process.env.CLOVA_OCR_SECRET;
   if (!invokeUrl || !secret) {
     return sendJson(res, 500, { error: "Missing CLOVA_OCR_INVOKE_URL or CLOVA_OCR_SECRET in env" });
   }
+  const format = formatHint === "png" ? "png" : "jpg";
   const payload = {
     version: "V2",
     requestId: crypto.randomUUID(),
     timestamp: Date.now(),
-    images: [{ format: "jpg", name: "diary", data: imageBase64 }],
+    images: [{ format, name: "diary", data: imageBase64 }],
   };
   const data = await requestJson(invokeUrl, {
     method: "POST",
     headers: { "Content-Type": "application/json", "X-OCR-SECRET": secret },
     body: JSON.stringify(payload),
   });
-  const lines = [];
-  const fields = data?.images?.[0]?.fields || [];
-  for (const field of fields) if (field?.inferText) lines.push(field.inferText);
-  sendJson(res, 200, { text: lines.join(" ").trim(), raw: data });
+  const text = extractOcrText(data);
+  if (!text) {
+    return sendJson(res, 422, { error: "인식된 글자가 없어요. 밝은 곳에서 다시 촬영해 주세요." });
+  }
+  sendJson(res, 200, { text, raw: data });
 }
 
 async function handleSummarize(res, body) {

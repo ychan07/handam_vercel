@@ -270,7 +270,7 @@ function renderEmotionPickers() {
         `<div class="emo-opt${index === 0 ? " sel" : ""}" data-mood="${escapeHtml(e.id)}">${e.emoji} ${escapeHtml(e.label)}</div>`
     )
     .join("");
-  for (const selector of ["#emo-pick", "#manual-mood"]) {
+  for (const selector of ["#manual-mood"]) {
     const container = document.querySelector(selector);
     if (!container) continue;
     container.innerHTML = html;
@@ -580,6 +580,37 @@ function initWorker() { dbWorker = new Worker("./db-worker.js"); dbWorker.onmess
 function formatDate(isoDate) { const date = new Date(isoDate); return `${date.getMonth() + 1}월 ${date.getDate()}일`; }
 function apiPost(url, payload) { return fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload || {}) }).then(async (response) => { const data = await response.json(); if (!response.ok) throw new Error(data.error || "요청이 실패했습니다."); return data; }); }
 function fileToBase64(file) { return new Promise((resolve, reject) => { const reader = new FileReader(); reader.onload = () => resolve(String(reader.result || "").split(",")[1] || ""); reader.onerror = reject; reader.readAsDataURL(file); }); }
+/** OCR 업로드용 — 긴 변 최대 maxEdge, JPEG로 통일 */
+function prepareImageForOcr(file, maxEdge = 1920, quality = 0.88) {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      let { width, height } = img;
+      const scale = Math.min(1, maxEdge / Math.max(width, height, 1));
+      width = Math.max(1, Math.round(width * scale));
+      height = Math.max(1, Math.round(height * scale));
+      const canvas = document.createElement("canvas");
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) {
+        fileToBase64(file).then(resolve).catch(reject);
+        return;
+      }
+      ctx.fillStyle = "#fff";
+      ctx.fillRect(0, 0, width, height);
+      ctx.drawImage(img, 0, 0, width, height);
+      resolve(canvas.toDataURL("image/jpeg", quality).split(",")[1] || "");
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      fileToBase64(file).then(resolve).catch(reject);
+    };
+    img.src = url;
+  });
+}
 function currentPageId() { return document.querySelector(".page.active")?.id?.replace("page-", "") || ""; }
 async function setAuthFromUser(user) {
   const idToken = await user.getIdToken();
@@ -705,7 +736,12 @@ function animateGauge() {
   };
   window._gauge = requestAnimationFrame(tick);
 }
-function setStep(step) { document.getElementById("ocr-upload").style.display = step === "upload" ? "block" : "none"; document.getElementById("ocr-loading").style.display = step === "loading" ? "block" : "none"; document.getElementById("ocr-result").style.display = step === "result" ? "block" : "none"; }
+function setOcrStep(step) {
+  const upload = document.getElementById("ocr-upload");
+  const loading = document.getElementById("ocr-loading");
+  if (upload) upload.style.display = step === "loading" ? "none" : "block";
+  if (loading) loading.style.display = step === "loading" ? "block" : "none";
+}
 function bindMoodPicker(selector) {
   const container = document.querySelector(selector);
   if (!container || container.dataset.moodBound === "1") return;
@@ -724,41 +760,59 @@ function getSelectedMood(selector) {
   return emotionOptions[0]?.id || "평온";
 }
 
+/** Clova OCR 결과 → 직접 입력 폼 (제목·본문). 저장은 사용자가 직접 입력 화면에서. */
+function fillManualFromOcr(text) {
+  const normalized = String(text || "").trim();
+  if (!normalized) return false;
+  const titleEl = document.getElementById("manual-title");
+  const bodyEl = document.getElementById("manual-body");
+  const lines = normalized.split(/\n+/).map((line) => line.trim()).filter(Boolean);
+  let title = state.selectedPrompt || "";
+  let body = normalized;
+  if (!title && lines.length > 1) {
+    title = lines[0].slice(0, 80);
+    body = lines.slice(1).join("\n");
+  }
+  if (titleEl) titleEl.value = title;
+  if (bodyEl) {
+    bodyEl.value = body;
+    requestAnimationFrame(() => {
+      bodyEl.focus();
+      const end = bodyEl.value.length;
+      bodyEl.setSelectionRange(end, end);
+    });
+  }
+  return true;
+}
+
 async function runOCRFile(file) {
   if (!file) return;
-  setStep("loading");
+  if (!file.type?.startsWith("image/")) {
+    showToast("이미지 파일만 선택할 수 있어요.");
+    return;
+  }
+  setOcrStep("loading");
   const status = document.getElementById("ocr-status");
-  status.textContent = "손글씨를 인식하고 있어요…";
+  if (status) status.textContent = "네이버 Clova로 손글씨를 인식하고 있어요…";
   try {
-    const base64 = await fileToBase64(file);
-    const ocrData = await apiPost("/api/ocr", { imageBase64: base64 });
-    status.textContent = "AI가 문장을 다듬고 있어요…";
-    const ai = await apiPost("/api/llm/summarize", { text: ocrData.text || "텍스트 인식 실패" });
-    document.getElementById("ocr-origin").textContent = ai.cleanedText || ocrData.text || "";
-    document.getElementById("ocr-summary").textContent = `“${ai.summary || "요약을 생성하지 못했습니다."}”`;
-    setStep("result");
-  } catch (error) { showToast(error.message || "OCR 처리에 실패했어요."); resetOCR(); }
+    const imageBase64 = await prepareImageForOcr(file);
+    if (!imageBase64) throw new Error("이미지를 불러오지 못했어요.");
+    const ocrData = await apiPost("/api/ocr", { imageBase64, format: "jpg" });
+    const text = String(ocrData.text || "").trim();
+    if (!text) throw new Error("인식된 글자가 없어요. 밝은 곳에서 다시 촬영해 주세요.");
+    resetOCR();
+    fillManualFromOcr(text);
+    showToast("인식한 글을 직접 입력란에 넣었어요. 확인한 뒤 저장하세요.");
+    go("manual");
+  } catch (error) {
+    showToast(error.message || "OCR 처리에 실패했어요.");
+    resetOCR();
+  }
 }
 
 function openCameraOCR() { const input = document.getElementById("ocr-camera-file"); input.value = ""; input.click(); }
 function openGalleryOCR() { const input = document.getElementById("ocr-gallery-file"); input.value = ""; input.click(); }
-function resetOCR() { setStep("upload"); document.getElementById("ocr-origin").textContent = ""; document.getElementById("ocr-summary").textContent = ""; }
-
-async function saveDiary() {
-  const title = state.selectedPrompt || "OCR 기록";
-  const body = document.getElementById("ocr-origin").textContent.trim();
-  const summary = document.getElementById("ocr-summary").textContent.replace(/^“|”$/g, "");
-  if (!body) return showToast("저장할 OCR 결과가 없어요.");
-  const result = await callWorker("insert", {
-    title,
-    body,
-    summary,
-    mood: formatMoodForSave(getSelectedMood("#emo-pick")),
-    createdAt: new Date().toISOString(),
-    entryDate: diaryEntryDate(),
-  });
-  persistSerialized(result); await reloadRecords(); showToast("OCR 일기를 저장했어요."); go("records");
-}
+function resetOCR() { setOcrStep("upload"); }
 
 async function saveManualDiary() {
   const title = document.getElementById("manual-title").value.trim() || "제목 없는 기록";
@@ -892,9 +946,10 @@ async function login() {
   const password = document.getElementById("login-password").value.trim();
   if (!email || !password) return showToast("이메일과 비밀번호를 입력해주세요.");
 
-  if (email === "admin" && password === "admin") {
+  // 관리자 아이디는 이메일 형식이 아닌 경우가 많음 → 관리자 API로 먼저 시도
+  if (!email.includes("@")) {
     try {
-      await loginAsAdmin("admin", "admin");
+      await loginAsAdmin(email, password);
     } catch (error) {
       showToast(error.message || "관리자 로그인에 실패했어요.");
     }
@@ -907,7 +962,13 @@ async function login() {
     showToast("로그인 성공");
     go("home");
   } catch (error) {
-    showToast(authErrorMessage(error));
+    // 이메일 형식 관리자 아이디 대비: 일반 로그인 실패 시 관리자 API도 시도
+    try {
+      await loginAsAdmin(email, password);
+      return;
+    } catch (_adminError) {
+      showToast(authErrorMessage(error));
+    }
   }
 }
 async function registerFromSignup() {
@@ -1199,7 +1260,7 @@ async function saveAdminCredentials() {
     sessionStorage.setItem("handam-admin", JSON.stringify(state.admin));
     document.getElementById("admin-current-password").value = "";
     document.getElementById("admin-new-password").value = "";
-    showToast("관리자 계정 정보를 변경했어요.");
+    showToast("관리자 계정을 변경했어요. 다음부터는 새 아이디·비밀번호로 로그인하세요.");
   } catch (error) {
     showToast(error.message || "관리자 정보 변경에 실패했어요.");
   }
@@ -1571,7 +1632,7 @@ function bindSegmentButtons() {
 
 window.deleteCurrentRecord = deleteCurrentRecord;
 window.go = go; window.toggleTheme = toggleTheme; window.toggleSwitch = toggleSwitch;
-window.openCameraOCR = openCameraOCR; window.openGalleryOCR = openGalleryOCR; window.resetOCR = resetOCR; window.saveDiary = saveDiary;
+window.openCameraOCR = openCameraOCR; window.openGalleryOCR = openGalleryOCR; window.resetOCR = resetOCR;
 window.refreshPrompts = refreshPrompts; window.startPromptDiary = startPromptDiary; window.openManualDiary = openManualDiary; window.saveManualDiary = saveManualDiary;
 window.updateFortuneFromBirthday = updateFortuneFromBirthday; window.logout = logout; window.login = login;
 window.loginWithGoogle = loginWithGoogle;

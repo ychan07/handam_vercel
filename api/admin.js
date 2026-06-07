@@ -84,7 +84,12 @@ module.exports = async function handler(req, res) {
     if (action === "login") {
       return sendJson(res, 401, { error: error.message || "Unauthorized" });
     }
-    const status = /비밀번호|아이디|필요/.test(error.message || "") ? 400 : 500;
-    sendJson(res, status, { error: error.message || "Server error" });
+    const msg = error.message || "Server error";
+    const status = /비밀번호|아이디|필요|만료/.test(msg) ? 400 : 500;
+    const friendly =
+      /EROFS|read-only|EPERM|EACCES/i.test(msg)
+        ? "서버 저장소 오류로 표시됐지만, 변경이 반영됐을 수 있어요. 새 아이디·비밀번호로 다시 로그인해 보세요."
+        : msg;
+    sendJson(res, status, { error: friendly });
   }
 };

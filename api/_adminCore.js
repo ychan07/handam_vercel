@@ -72,8 +72,12 @@ function readLocalConfig() {
 }
 
 function writeLocalConfig(config) {
-  fs.mkdirSync(path.dirname(CONFIG_PATH), { recursive: true });
-  fs.writeFileSync(CONFIG_PATH, JSON.stringify(config, null, 2), "utf8");
+  try {
+    fs.mkdirSync(path.dirname(CONFIG_PATH), { recursive: true });
+    fs.writeFileSync(CONFIG_PATH, JSON.stringify(config, null, 2), "utf8");
+  } catch (_error) {
+    // Vercel 등 서버리스 환경은 배포 경로가 읽기 전용 — Firestore가 있으면 그쪽이 기준
+  }
 }
 
 function isValidConfig(config) {

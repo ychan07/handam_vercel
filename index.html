@@ -191,7 +191,7 @@
           <div class="cam-badge"><i class="fa-solid fa-camera"></i></div>
           <div style="font-size:15px;font-weight:800">손글씨 일기를 찍어주세요</div>
           <div class="muted" style="font-size:12px;font-weight:600;margin-top:5px">
-            AI가 글씨를 인식하고 깔끔하게 정리해드려요
+            네이버 Clova OCR로 읽은 뒤 직접 입력란에 자동으로 채워드려요
           </div>
           <input id="ocr-camera-file" class="input" type="file" accept="image/*" capture="environment" style="display:none">
           <input id="ocr-gallery-file" class="input" type="file" accept="image/*" style="display:none">
@@ -228,28 +228,6 @@
         </div>
       </div>
 
-      <!-- Step 3: result -->
-      <div id="ocr-result" style="display:none">
-        <div class="reveal" style="margin-top:16px">
-          <span class="eyebrow"><i class="fa-solid fa-circle-check"></i> 인식 완료</span>
-        </div>
-        <div class="card reveal" style="--d:.05s;margin-top:10px">
-          <div class="muted" style="font-size:12px;font-weight:800;margin-bottom:10px">원문 (Clova OCR)</div>
-          <p class="ocr-quote" id="ocr-origin"></p>
-        </div>
-        <div class="card reveal" style="--d:.1s;margin-top:12px;background:var(--accent-soft);border-color:transparent">
-          <span class="eyebrow"><i class="fa-solid fa-wand-magic-sparkles"></i> AI 한 줄 요약</span>
-          <p class="serif" id="ocr-summary" style="font-size:16px;font-weight:700;line-height:1.6;margin-top:9px;color:var(--text)"></p>
-        </div>
-        <div class="reveal" style="--d:.15s;margin:20px 4px 10px">
-          <span class="h-sec">오늘의 감정은 어땠나요?</span>
-        </div>
-        <div class="emo-pick reveal" style="--d:.18s" id="emo-pick"></div>
-        <div class="reveal" style="--d:.22s;display:flex;gap:10px;margin-top:22px">
-          <button class="btn btn-line" style="flex:0 0 40%" onclick="resetOCR()">다시 찍기</button>
-          <button class="btn btn-primary" onclick="saveDiary()"><i class="fa-solid fa-bookmark"></i> 저장하기</button>
-        </div>
-      </div>
     </div>
   </div>
 
@@ -439,7 +417,10 @@
         <label class="field-label">제목</label>
         <input class="input" id="manual-title" type="text" placeholder="오늘의 작은 발견" autocomplete="off">
         <label class="field-label" style="margin-top:14px">본문</label>
-        <textarea class="textarea" id="manual-body" placeholder="오늘은 평소보다 천천히 걸었다. 익숙한 길에서도 새로운 간판과 나무 그림자가 눈에 들어왔다." autocomplete="off"></textarea>
+        <textarea class="textarea" id="manual-body" placeholder="사진으로 일기를 찍으면 Clova OCR 인식 결과가 여기에 채워져요. 확인·수정 후 저장하세요." autocomplete="off"></textarea>
+        <p class="muted" style="font-size:11px;font-weight:600;margin-top:8px;line-height:1.5">
+          <i class="fa-solid fa-camera"></i> 기록 탭에서 촬영·보관함으로 사진을 넣을 수 있어요.
+        </p>
         <label class="field-label" style="margin-top:14px">감정</label>
         <div class="emo-pick" id="manual-mood"></div>
       </div>
@@ -513,7 +494,7 @@
       </div>
       <div class="card reveal" style="--d:.07s;margin-top:12px">
         <label class="field-label">이메일</label>
-        <input class="input" id="login-email" type="email" value="" placeholder="you@example.com" autocomplete="email">
+        <input class="input" id="login-email" type="text" value="" placeholder="이메일 또는 관리자 아이디" autocomplete="username">
         <label class="field-label" style="margin-top:14px">비밀번호</label>
         <input class="input" id="login-password" type="password" value="" placeholder="비밀번호" autocomplete="current-password">
         <button class="btn btn-primary" style="margin-top:16px" onclick="login()">
