@@ -124,19 +124,35 @@ function collectNeededHips(iau, zodiacEnglish) {
   return needed;
 }
 
-/** 가로(적경) 방향 별 간격 — 1보다 크면 별자리가 가로로 넓어짐 (UI 크기는 그대로) */
-const HORIZONTAL_STRETCH = 2.05;
+const VIEW_SIZE = 200;
+const VIEW_PADDING = 14;
 
-function gnomonicProject(stars, viewSize = 200, pad = 14, stretchX = HORIZONTAL_STRETCH) {
-  const raRad = stars.map((s) => (s.ra * Math.PI) / 180);
+function circularMeanRadians(angles) {
+  const sinSum = angles.reduce((sum, angle) => sum + Math.sin(angle), 0);
+  const cosSum = angles.reduce((sum, angle) => sum + Math.cos(angle), 0);
+  if (Math.hypot(sinSum, cosSum) < 1e-9) {
+    throw new Error("Cannot determine a stable right-ascension center");
+  }
+  return Math.atan2(sinSum, cosSum);
+}
+
+function gnomonicProject(stars, viewSize = VIEW_SIZE, pad = VIEW_PADDING) {
+  if (!stars.length) throw new Error("Cannot project an empty constellation");
+  if (pad < 0 || pad * 2 >= viewSize) throw new Error("Invalid constellation viewport padding");
+
+  // HYG stores right ascension in decimal hours: 24 h = 2π radians.
+  const raRad = stars.map((s) => (s.ra * Math.PI) / 12);
   const decRad = stars.map((s) => (s.dec * Math.PI) / 180);
-  const ra0 = raRad.reduce((a, b) => a + b, 0) / raRad.length;
+  const ra0 = circularMeanRadians(raRad);
   const dec0 = decRad.reduce((a, b) => a + b, 0) / decRad.length;
 
   const projected = stars.map((s, i) => {
     const ra = raRad[i];
     const dec = decRad[i];
     const cosC = Math.sin(dec0) * Math.sin(dec) + Math.cos(dec0) * Math.cos(dec) * Math.cos(ra - ra0);
+    if (!Number.isFinite(cosC) || cosC <= 0) {
+      throw new Error(`Star HIP ${s.hip} cannot be projected into the constellation viewport`);
+    }
     const x = (Math.cos(dec) * Math.sin(ra - ra0)) / cosC;
     const y = (Math.cos(dec0) * Math.sin(dec) - Math.sin(dec0) * Math.cos(dec) * Math.cos(ra - ra0)) / cosC;
     return { x, y, mag: s.mag, hip: s.hip };
@@ -148,15 +164,15 @@ function gnomonicProject(stars, viewSize = 200, pad = 14, stretchX = HORIZONTAL_
   const maxX = Math.max(...xs);
   const minY = Math.min(...ys);
   const maxY = Math.max(...ys);
+  const spanX = Math.max(maxX - minX, 1e-6);
   const spanY = Math.max(maxY - minY, 1e-6);
-  const scaleY = (viewSize - pad * 2) / spanY;
-  const scaleX = scaleY * stretchX;
+  const scale = (viewSize - pad * 2) / Math.max(spanX, spanY);
   const cx = (minX + maxX) / 2;
   const cy = (minY + maxY) / 2;
 
   return projected.map((p) => ({
-    vx: (p.x - cx) * scaleX + viewSize / 2,
-    vy: -(p.y - cy) * scaleY + viewSize / 2,
+    vx: (p.x - cx) * scale + viewSize / 2,
+    vy: -(p.y - cy) * scale + viewSize / 2,
     mag: p.mag,
     hip: p.hip,
   }));
@@ -233,6 +249,48 @@ function buildConstellation(polylines, hipMap) {
   };
 }
 
+function validateConstellation(name, art, viewSize = VIEW_SIZE, pad = VIEW_PADDING) {
+  if (!Array.isArray(art.stars) || art.stars.length < 2) {
+    throw new Error(`${name}: expected at least two constellation stars`);
+  }
+
+  const minPercent = (pad / viewSize) * 100;
+  const maxPercent = 100 - minPercent;
+  const tolerance = 0.1;
+  for (const [index, star] of art.stars.entries()) {
+    if (![star.x, star.y, star.size].every(Number.isFinite) || star.size <= 0) {
+      throw new Error(`${name}: invalid star data at index ${index}`);
+    }
+    if (
+      star.x < minPercent - tolerance ||
+      star.x > maxPercent + tolerance ||
+      star.y < minPercent - tolerance ||
+      star.y > maxPercent + tolerance
+    ) {
+      throw new Error(`${name}: star ${index} falls outside the padded viewport`);
+    }
+  }
+
+  if (!Number.isInteger(art.accentIndex) || art.accentIndex < 0 || art.accentIndex >= art.stars.length) {
+    throw new Error(`${name}: invalid accent star index`);
+  }
+  if (!Number.isFinite(art.pathLength) || art.pathLength <= 0) {
+    throw new Error(`${name}: invalid path length`);
+  }
+
+  const pathValues = art.pathD.match(/-?\d+(?:\.\d+)?/g)?.map(Number) || [];
+  if (pathValues.length < 4 || pathValues.length % 2 !== 0 || pathValues.some((value) => !Number.isFinite(value))) {
+    throw new Error(`${name}: invalid SVG path data`);
+  }
+  for (let i = 0; i < pathValues.length; i += 2) {
+    const x = pathValues[i];
+    const y = pathValues[i + 1];
+    if (x < pad - tolerance || x > viewSize - pad + tolerance || y < pad - tolerance || y > viewSize - pad + tolerance) {
+      throw new Error(`${name}: SVG path falls outside the padded viewport`);
+    }
+  }
+}
+
 async function main() {
   console.log("Fetching IAU constellation lines…");
   const iauText = await fetchText(IAU_URL);
@@ -253,6 +311,7 @@ async function main() {
     const polylines = iau[en];
     if (!polylines?.length) throw new Error(`No IAU lines for ${en}`);
     result[en] = buildConstellation(polylines, hipMap);
+    validateConstellation(en, result[en]);
     console.log(`  ${ko} (${en}): ${result[en].stars.length} stars, path ${result[en].pathLength}`);
   }
 
