@@ -5,6 +5,7 @@ const {
   changeAdminCredentials,
   getAdminStats,
   getAdminUsers,
+  getAdminOverview,
   resetUserPassword,
   setUserDisabled,
   deleteUser,
@@ -50,11 +51,15 @@ module.exports = async function handler(req, res) {
       if (!verifyAdminToken(adminToken)) return sendJson(res, 401, { error: "관리자 인증이 필요합니다." });
     }
 
+    const force = Boolean(body?.refresh);
+    if (action === "overview") {
+      return sendJson(res, 200, await getAdminOverview(force));
+    }
     if (action === "stats") {
-      return sendJson(res, 200, await getAdminStats());
+      return sendJson(res, 200, await getAdminStats(force));
     }
     if (action === "users") {
-      const users = await getAdminUsers();
+      const users = await getAdminUsers(force);
       return sendJson(res, 200, { users });
     }
     if (action === "reset-password") {

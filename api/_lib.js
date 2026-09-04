@@ -1,7 +1,13 @@
 const crypto = require("crypto");
 
 function sendJson(res, statusCode, body) {
-  res.status(statusCode).json(body);
+  // Vercel은 res.status().json()을 주지만, 로컬 server.cjs는 순수 Node ServerResponse를 넘긴다.
+  if (typeof res.status === "function" && typeof res.json === "function") {
+    res.status(statusCode).json(body);
+    return;
+  }
+  res.writeHead(statusCode, { "Content-Type": "application/json; charset=utf-8" });
+  res.end(JSON.stringify(body));
 }
 
 async function readBody(req) {

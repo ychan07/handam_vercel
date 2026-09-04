@@ -619,19 +619,37 @@
         </div>
       </div>
       <div class="admin-toolbar reveal" style="--d:.1s">
-        <input class="input admin-search" id="admin-search" type="search" placeholder="이름·이메일 검색">
+        <input class="input admin-search" id="admin-search" type="search" placeholder="이름·이메일·UID 검색">
         <select class="field admin-filter" id="admin-filter">
           <option value="all">전체</option>
           <option value="active">활동 중</option>
+          <option value="offline">오프라인</option>
           <option value="disabled">정지됨</option>
         </select>
       </div>
       <div class="admin-toolbar reveal" style="--d:.12s">
-        <button type="button" class="btn btn-line admin-mini-btn" onclick="renderAdminUsers()"><i class="fa-solid fa-rotate"></i> 새로고침</button>
+        <select class="field admin-filter admin-sort" id="admin-sort">
+          <option value="recent">최근 접속순</option>
+          <option value="created">최근 가입순</option>
+          <option value="name">이름순</option>
+        </select>
+        <button type="button" class="btn btn-line admin-mini-btn" onclick="refreshAdminUsers()"><i class="fa-solid fa-rotate"></i> 새로고침</button>
         <button type="button" class="btn btn-line admin-mini-btn" onclick="exportAdminUsersCsv()"><i class="fa-solid fa-file-csv"></i> CSV</button>
-        <span class="muted" style="font-size:12px;font-weight:700;margin-left:auto" id="admin-list-count">0명</span>
+      </div>
+      <div class="admin-listbar reveal" style="--d:.13s">
+        <span id="admin-list-count">0명</span>
+        <span id="admin-updated-at" class="admin-listbar-time"></span>
       </div>
       <div class="admin-user-list reveal" style="--d:.14s" id="admin-user-list"></div>
+      <div class="admin-pager reveal" style="--d:.16s;display:none" id="admin-pager">
+        <button type="button" class="admin-page-btn" id="admin-prev" onclick="changeAdminPage(-1)">
+          <i class="fa-solid fa-chevron-left"></i>
+        </button>
+        <span class="admin-page-info" id="admin-page-info">1 / 1</span>
+        <button type="button" class="admin-page-btn" id="admin-next" onclick="changeAdminPage(1)">
+          <i class="fa-solid fa-chevron-right"></i>
+        </button>
+      </div>
       <div class="reveal" style="--d:.18s;margin:22px 4px 10px"><span class="h-sec">관리자 계정</span></div>
       <div class="card reveal" style="--d:.2s">
         <label class="field-label">현재 비밀번호</label>

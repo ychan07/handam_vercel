@@ -69,9 +69,13 @@ const state = {
   fortune: null,
   selectedPrompt: "",
   adminUsers: [],
+  adminPage: 0,
+  adminExpandedUid: null,
+  adminFetchedAt: null,
   settings: null,
   recordsSource: "none",
 };
+const ADMIN_PAGE_SIZE = 20;
 const googleProvider = new GoogleAuthProvider();
 const AUTH_PAGES = new Set(["login", "signup", "find-account", "admin"]);
 let presenceTimer = null;
@@ -1353,6 +1357,8 @@ async function logout() {
   state.profile = null;
   state.admin = null;
   state.adminUsers = [];
+  state.adminPage = 0;
+  state.adminExpandedUid = null;
   state.settings = normalizeUserSettings();
   state.records = [];
   state.recordsSource = "none";
@@ -1368,6 +1374,9 @@ async function logout() {
 }
 function adminLogout() {
   state.admin = null;
+  state.adminUsers = [];
+  state.adminPage = 0;
+  state.adminExpandedUid = null;
   state.auth = null;
   state.settings = normalizeUserSettings();
   state.records = [];
@@ -1381,35 +1390,66 @@ function adminLogout() {
 function formatAdminDate(iso) {
   if (!iso) return "-";
   const d = new Date(iso);
-  return `${d.getMonth() + 1}/${d.getDate()} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+  if (Number.isNaN(d.getTime())) return "-";
+  const time = `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+  if (d.getFullYear() !== new Date().getFullYear()) {
+    return `${String(d.getFullYear()).slice(2)}.${d.getMonth() + 1}.${d.getDate()}`;
+  }
+  return `${d.getMonth() + 1}/${d.getDate()} ${time}`;
+}
+function adminUserLabel(user) {
+  return user.displayName || user.email?.split("@")[0] || "유저";
+}
+function adminSortValue(user, sort) {
+  const time = (v) => (v ? new Date(v).getTime() || 0 : 0);
+  if (sort === "created") return time(user.createdAt);
+  return time(user.lastSeen || user.lastSignIn);
 }
 function getFilteredAdminUsers() {
   const q = (document.getElementById("admin-search")?.value || "").trim().toLowerCase();
   const filter = document.getElementById("admin-filter")?.value || "all";
-  return state.adminUsers.filter((user) => {
+  const sort = document.getElementById("admin-sort")?.value || "recent";
+  const rows = state.adminUsers.filter((user) => {
     if (filter === "active" && !user.active) return false;
+    if (filter === "offline" && user.active) return false;
     if (filter === "disabled" && !user.disabled) return false;
-    if (filter === "online" && !user.active) return false;
     if (!q) return true;
     const hay = `${user.displayName || ""} ${user.email || ""} ${user.uid}`.toLowerCase();
     return hay.includes(q);
   });
+  if (sort === "name") {
+    rows.sort((a, b) => adminUserLabel(a).localeCompare(adminUserLabel(b), "ko"));
+  } else {
+    // 인원이 많아지면 활동 중인 유저가 위로 오도록 우선 정렬한다.
+    rows.sort((a, b) => {
+      if (sort === "recent" && a.active !== b.active) return a.active ? -1 : 1;
+      return adminSortValue(b, sort) - adminSortValue(a, sort);
+    });
+  }
+  return rows;
+}
+function csvCell(value) {
+  const text = String(value ?? "");
+  // 스프레드시트에서 수식으로 해석되지 않도록 방어한다.
+  const safe = /^[=+\-@]/.test(text) ? `'${text}` : text;
+  return `"${safe.replace(/"/g, '""')}"`;
 }
 function exportAdminUsersCsv() {
   const users = getFilteredAdminUsers();
-  const header = ["uid", "displayName", "email", "disabled", "active", "createdAt", "lastSignIn", "providers"];
+  const header = ["uid", "displayName", "email", "disabled", "active", "createdAt", "lastSignIn", "lastSeen", "providers"];
   const lines = [header.join(",")];
   users.forEach((u) => {
     lines.push(
       [
-        u.uid,
-        `"${(u.displayName || "").replace(/"/g, '""')}"`,
-        u.email || "",
+        csvCell(u.uid),
+        csvCell(u.displayName || ""),
+        csvCell(u.email || ""),
         u.disabled,
         u.active,
-        u.createdAt || "",
-        u.lastSignIn || "",
-        `"${(u.providers || []).join("|")}"`,
+        csvCell(u.createdAt || ""),
+        csvCell(u.lastSignIn || ""),
+        csvCell(u.lastSeen || ""),
+        csvCell((u.providers || []).join("|")),
       ].join(",")
     );
   });
@@ -1424,108 +1464,150 @@ function exportAdminUsersCsv() {
   URL.revokeObjectURL(url);
   showToast("유저 목록 CSV를 저장했어요.");
 }
-async function loadAdminDashboard() {
+function applyAdminStats(stats) {
+  const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = String(v ?? 0); };
+  set("admin-total-users", stats.totalUsers);
+  set("admin-active-users", stats.activeUsers);
+  set("admin-disabled-users", stats.disabledUsers);
+  set("admin-email-users", stats.emailUsers);
+  set("admin-active-window", stats.activeWindowMinutes ?? 15);
+  const hint = document.getElementById("admin-firebase-hint");
+  if (!hint) return;
+  if (!stats.firebaseConfigured) {
+    hint.textContent = "FIREBASE_SERVICE_ACCOUNT 환경 변수를 설정하면 유저 관리 기능이 활성화됩니다.";
+    hint.className = "admin-hint warn";
+    hint.style.display = "block";
+  } else if (stats.truncated) {
+    hint.textContent = `유저가 ${stats.scanLimit}명을 넘어 일부만 불러왔어요. 검색으로 범위를 좁혀 주세요.`;
+    hint.className = "admin-hint warn";
+    hint.style.display = "block";
+  } else if (stats.firestoreEnabled === false) {
+    hint.textContent = "Firestore 미연동 · 활동 중 유저는 최근 로그인 기준으로 표시됩니다.";
+    hint.className = "admin-hint info";
+    hint.style.display = "block";
+  } else {
+    hint.style.display = "none";
+  }
+}
+async function loadAdminDashboard(force = false) {
   if (!state.admin?.token) return go("login");
   const adminName = document.getElementById("admin-username-label");
   if (adminName) adminName.textContent = state.admin.username || "admin";
+  const box = document.getElementById("admin-user-list");
+  if (box && !state.adminUsers.length) box.innerHTML = '<div class="admin-empty">불러오는 중…</div>';
   try {
-    const stats = await adminApi("/api/admin/stats");
-    const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = String(v ?? 0); };
-    set("admin-total-users", stats.totalUsers);
-    set("admin-active-users", stats.activeUsers);
-    set("admin-disabled-users", stats.disabledUsers);
-    set("admin-email-users", stats.emailUsers);
-    set("admin-active-window", stats.activeWindowMinutes ?? 15);
-    const hint = document.getElementById("admin-firebase-hint");
-    if (hint) {
-      if (!stats.firebaseConfigured) {
-        hint.textContent = "FIREBASE_SERVICE_ACCOUNT 환경 변수를 설정하면 유저 관리 기능이 활성화됩니다.";
-        hint.className = "admin-hint warn";
-        hint.style.display = "block";
-      } else if (stats.firestoreEnabled === false) {
-        hint.textContent = "Firestore 미연동 · 활동 중 유저는 최근 로그인 기준으로 표시됩니다.";
-        hint.className = "admin-hint info";
-        hint.style.display = "block";
-      } else {
-        hint.style.display = "none";
-      }
-    }
-    await renderAdminUsers();
+    // stats와 users를 한 번의 요청으로 받아 유저가 많아져도 Auth 스캔이 두 번 돌지 않게 한다.
+    const data = await adminApi("/api/admin/overview", force ? { refresh: true } : undefined);
+    applyAdminStats(data.stats || {});
+    state.adminUsers = data.users || [];
+    state.adminFetchedAt = data.stats?.fetchedAt || new Date().toISOString();
+    paintAdminUserList();
   } catch (error) {
+    if (box) box.innerHTML = `<div class="admin-empty">${escapeHtml(error.message || "목록 로드 실패")}</div>`;
     showToast(error.message || "관리자 데이터를 불러오지 못했어요.");
   }
 }
-async function renderAdminUsers() {
-  const box = document.getElementById("admin-user-list");
-  const countEl = document.getElementById("admin-list-count");
-  if (!box) return;
-  box.innerHTML = '<div class="admin-empty">불러오는 중…</div>';
-  try {
-    const data = await adminApi("/api/admin/users");
-    state.adminUsers = data.users || [];
-    paintAdminUserList();
-    if (countEl) countEl.textContent = `${getFilteredAdminUsers().length}명 표시`;
-  } catch (error) {
-    box.innerHTML = `<div class="admin-empty">${error.message || "목록 로드 실패"}</div>`;
-  }
+async function refreshAdminUsers() {
+  await loadAdminDashboard(true);
+}
+function changeAdminPage(delta) {
+  state.adminPage += delta;
+  state.adminExpandedUid = null;
+  paintAdminUserList();
+  document.getElementById("admin-user-list")?.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+function adminUserToolsHtml(user, label) {
+  const uid = escapeHtml(user.uid);
+  const email = escapeHtml(user.email || "");
+  return `<div class="admin-user-tools">
+      ${
+        user.email
+          ? `<input class="input admin-reset-input" type="password" placeholder="새 비밀번호 (6자+)" data-uid="${uid}">
+      <button type="button" class="admin-tool-btn" data-action="reset-pw" data-uid="${uid}"><i class="fa-solid fa-key"></i> 비번 초기화</button>
+      <button type="button" class="admin-tool-btn" data-action="reset-link" data-email="${email}"><i class="fa-solid fa-link"></i> 재설정 링크</button>`
+          : ""
+      }
+      <button type="button" class="admin-tool-btn" data-action="toggle" data-uid="${uid}" data-disabled="${user.disabled}">
+        <i class="fa-solid fa-${user.disabled ? "check" : "ban"}"></i> ${user.disabled ? "정지 해제" : "계정 정지"}
+      </button>
+      <button type="button" class="admin-tool-btn danger" data-action="delete" data-uid="${uid}" data-label="${escapeHtml(label)}" data-email="${email}">
+        <i class="fa-solid fa-trash"></i> 삭제
+      </button>
+      <div class="admin-user-uid">UID ${uid}</div>
+    </div>`;
 }
 function paintAdminUserList() {
   const box = document.getElementById("admin-user-list");
   const countEl = document.getElementById("admin-list-count");
+  const timeEl = document.getElementById("admin-updated-at");
+  const pager = document.getElementById("admin-pager");
   if (!box) return;
+  if (timeEl) timeEl.textContent = state.adminFetchedAt ? `${formatAdminDate(state.adminFetchedAt)} 기준` : "";
+
   const users = getFilteredAdminUsers();
-  if (countEl) countEl.textContent = `${users.length}명 표시`;
+  const pageCount = Math.max(1, Math.ceil(users.length / ADMIN_PAGE_SIZE));
+  state.adminPage = Math.min(Math.max(state.adminPage, 0), pageCount - 1);
+  const start = state.adminPage * ADMIN_PAGE_SIZE;
+  const pageRows = users.slice(start, start + ADMIN_PAGE_SIZE);
+
+  if (countEl) {
+    countEl.textContent = users.length
+      ? `${users.length}명 중 ${start + 1}–${start + pageRows.length}`
+      : "0명";
+  }
+  if (pager) {
+    // 한 페이지에 담기면 페이저를 숨겨 기존 화면과 같아 보이게 한다.
+    pager.style.display = users.length > ADMIN_PAGE_SIZE ? "flex" : "none";
+    const info = document.getElementById("admin-page-info");
+    if (info) info.textContent = `${state.adminPage + 1} / ${pageCount}`;
+    const prev = document.getElementById("admin-prev");
+    const next = document.getElementById("admin-next");
+    if (prev) prev.disabled = state.adminPage === 0;
+    if (next) next.disabled = state.adminPage >= pageCount - 1;
+  }
   if (!users.length) {
     box.innerHTML = '<div class="admin-empty">조건에 맞는 사용자가 없습니다.</div>';
     return;
   }
-  box.innerHTML = "";
-  users.forEach((user) => {
-    const label = user.displayName || user.email?.split("@")[0] || "유저";
-    const initial = label.slice(0, 1);
+
+  const frag = document.createDocumentFragment();
+  pageRows.forEach((user) => {
+    const label = adminUserLabel(user);
+    const open = state.adminExpandedUid === user.uid;
     const row = document.createElement("article");
-    row.className = "admin-user-card";
+    row.className = `admin-user-card${open ? " open" : ""}`;
     row.innerHTML = `
-      <div class="admin-user-head">
-        <div class="admin-user-avatar">${initial}</div>
+      <button type="button" class="admin-user-head" data-action="expand" data-uid="${escapeHtml(user.uid)}">
+        <div class="admin-user-avatar${user.disabled ? " off" : ""}">${escapeHtml(label.slice(0, 1))}</div>
         <div class="admin-user-meta">
-          <div class="admin-user-name">${label}</div>
-          <div class="admin-user-email">${user.email || "이메일 없음"}</div>
+          <div class="admin-user-name">${escapeHtml(label)}</div>
+          <div class="admin-user-email">${escapeHtml(user.email || "이메일 없음")}</div>
           <div class="admin-user-tags">
             <span class="chip ${user.active ? "emo-calm" : ""}">${user.active ? "활동 중" : "오프라인"}</span>
             ${user.disabled ? '<span class="chip emo-excited">정지됨</span>' : ""}
-            <span class="chip">${(user.providers || []).map((p) => p.replace(".com", "")).join(" · ") || "—"}</span>
+            <span class="chip">${escapeHtml((user.providers || []).map((p) => p.replace(".com", "")).join(" · ")) || "—"}</span>
           </div>
           <div class="admin-user-dates">
-            가입 ${formatAdminDate(user.createdAt)} · 최근 ${formatAdminDate(user.lastSignIn)}
+            가입 ${formatAdminDate(user.createdAt)} · 최근 ${formatAdminDate(user.lastSeen || user.lastSignIn)}
           </div>
         </div>
-      </div>
-      <div class="admin-user-tools">
-        ${
-          user.email
-            ? `<input class="input admin-reset-input" type="password" placeholder="새 비밀번호 (6자+)" data-uid="${user.uid}">
-        <button type="button" class="admin-tool-btn" data-action="reset-pw" data-uid="${user.uid}"><i class="fa-solid fa-key"></i> 비번 초기화</button>
-        <button type="button" class="admin-tool-btn" data-action="reset-link" data-email="${user.email}"><i class="fa-solid fa-link"></i> 재설정 링크</button>`
-            : ""
-        }
-        <button type="button" class="admin-tool-btn" data-action="toggle" data-uid="${user.uid}" data-disabled="${user.disabled}">
-          <i class="fa-solid fa-${user.disabled ? "check" : "ban"}"></i> ${user.disabled ? "정지 해제" : "계정 정지"}
-        </button>
-        <button type="button" class="admin-tool-btn danger" data-action="delete" data-uid="${user.uid}" data-label="${label}">
-          <i class="fa-solid fa-trash"></i> 삭제
-        </button>
-      </div>`;
-    box.appendChild(row);
+        <i class="fa-solid fa-chevron-down admin-user-caret"></i>
+      </button>
+      ${open ? adminUserToolsHtml(user, label) : ""}`;
+    frag.appendChild(row);
   });
-  box.querySelectorAll("[data-action]").forEach((btn) => {
-    btn.addEventListener("click", () => handleAdminUserAction(btn));
-  });
+  box.innerHTML = "";
+  box.appendChild(frag);
 }
 async function handleAdminUserAction(btn) {
   const action = btn.dataset.action;
   const uid = btn.dataset.uid;
   try {
+    if (action === "expand") {
+      state.adminExpandedUid = state.adminExpandedUid === uid ? null : uid;
+      paintAdminUserList();
+      return;
+    }
     if (action === "reset-pw") {
       const input = document.querySelector(`.admin-reset-input[data-uid="${uid}"]`);
       const newPassword = input?.value?.trim();
@@ -1545,20 +1627,34 @@ async function handleAdminUserAction(btn) {
       const disabled = btn.dataset.disabled === "true";
       await adminApi("/api/admin/toggle-user", { uid, disabled: !disabled });
       showToast(disabled ? "계정 정지를 해제했어요." : "계정을 정지했어요.");
-      await renderAdminUsers();
+      await loadAdminDashboard(true);
     } else if (action === "delete") {
-      if (!confirm(`"${btn.dataset.label}" 계정을 삭제할까요? 되돌릴 수 없습니다.`)) return;
+      // 유저가 많아지면 이름만으로는 헷갈리므로 이메일까지 함께 확인시킨다.
+      const who = btn.dataset.email ? `${btn.dataset.label} (${btn.dataset.email})` : btn.dataset.label;
+      if (!confirm(`"${who}" 계정을 삭제할까요? 되돌릴 수 없습니다.`)) return;
       await adminApi("/api/admin/delete-user", { uid });
+      state.adminExpandedUid = null;
       showToast("계정을 삭제했어요.");
-      await loadAdminDashboard();
+      await loadAdminDashboard(true);
     }
   } catch (error) {
     showToast(error.message || "작업에 실패했어요.");
   }
 }
 function bindAdminControls() {
-  document.getElementById("admin-search")?.addEventListener("input", paintAdminUserList);
-  document.getElementById("admin-filter")?.addEventListener("change", paintAdminUserList);
+  const repaintFromFirstPage = () => {
+    state.adminPage = 0;
+    state.adminExpandedUid = null;
+    paintAdminUserList();
+  };
+  document.getElementById("admin-search")?.addEventListener("input", repaintFromFirstPage);
+  document.getElementById("admin-filter")?.addEventListener("change", repaintFromFirstPage);
+  document.getElementById("admin-sort")?.addEventListener("change", repaintFromFirstPage);
+  // 카드마다 리스너를 붙이지 않고 위임해서, 목록이 길어져도 바인딩 비용이 늘지 않게 한다.
+  document.getElementById("admin-user-list")?.addEventListener("click", (event) => {
+    const btn = event.target.closest("[data-action]");
+    if (btn) handleAdminUserAction(btn);
+  });
 }
 async function saveAdminCredentials() {
   if (!state.admin?.token) return showToast("관리자 로그인이 필요해요.");
@@ -1963,7 +2059,8 @@ window.sendPasswordReset = sendPasswordReset;
 window.showFindHint = showFindHint;
 window.adminLogout = adminLogout;
 window.saveAdminCredentials = saveAdminCredentials;
-window.renderAdminUsers = renderAdminUsers;
+window.refreshAdminUsers = refreshAdminUsers;
+window.changeAdminPage = changeAdminPage;
 window.loadAdminDashboard = loadAdminDashboard;
 window.exportAdminUsersCsv = exportAdminUsersCsv;
 window.changePassword = changePassword; window.exportDiaries = exportDiaries; window.showToast = showToast; window.openSheet = openSheet; window.closeSheet = closeSheet;

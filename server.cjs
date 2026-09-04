@@ -44,6 +44,7 @@ const API_ROUTE_MAP = {
   "/api/auth/register": [authHandler, "/api/auth", "register"],
   "/api/auth/change-password": [authHandler, "/api/auth", "change-password"],
   "/api/admin/login": [adminHandler, "/api/admin", "login"],
+  "/api/admin/overview": [adminHandler, "/api/admin", "overview"],
   "/api/admin/stats": [adminHandler, "/api/admin", "stats"],
   "/api/admin/users": [adminHandler, "/api/admin", "users"],
   "/api/admin/reset-password": [adminHandler, "/api/admin", "reset-password"],

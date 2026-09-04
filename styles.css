@@ -160,17 +160,47 @@ body{
 .admin-search{flex:1;min-width:140px;padding:12px 14px;font-size:14px}
 .admin-filter{flex:0 0 110px;padding:12px 8px;font-size:12px}
 .admin-mini-btn{width:auto;flex:0 0 auto;padding:11px 14px;font-size:12px}
+.admin-sort{flex:0 0 118px}
+.admin-listbar{
+  display:flex;align-items:center;gap:8px;margin:14px 4px 0;
+  font-size:12px;font-weight:700;color:var(--text-muted);
+}
+.admin-listbar-time{margin-left:auto;font-size:11px;font-weight:600;opacity:.8}
 .admin-user-list{display:flex;flex-direction:column;gap:10px;margin-top:12px}
 .admin-user-card{
   background:var(--surface);border:1px solid var(--border);border-radius:18px;
   padding:14px;box-shadow:var(--shadow);
 }
-.admin-user-head{display:flex;gap:12px}
+.admin-user-card.open{border-color:var(--accent-soft)}
+.admin-user-head{
+  display:flex;gap:12px;width:100%;align-items:flex-start;text-align:left;
+  background:none;border:0;padding:0;font-family:inherit;color:inherit;cursor:pointer;
+}
+.admin-user-caret{
+  font-size:11px;color:var(--text-muted);margin-top:14px;flex-shrink:0;
+  transition:transform .2s ease;
+}
+.admin-user-card.open .admin-user-caret{transform:rotate(180deg)}
+.admin-user-uid{
+  flex:1 1 100%;font-size:10px;font-weight:700;color:var(--text-muted);
+  margin-top:2px;word-break:break-all;
+}
+.admin-pager{
+  display:flex;align-items:center;justify-content:center;gap:14px;margin-top:14px;
+}
+.admin-page-btn{
+  width:38px;height:38px;border-radius:12px;border:1px solid var(--border);
+  background:var(--surface);color:var(--text-soft);font-size:12px;cursor:pointer;
+}
+.admin-page-btn:disabled{opacity:.35;cursor:default}
+.admin-page-btn:not(:disabled):active{transform:scale(.95)}
+.admin-page-info{font-size:12px;font-weight:800;color:var(--text-soft);min-width:52px;text-align:center}
 .admin-user-avatar{
   width:44px;height:44px;border-radius:14px;flex-shrink:0;
   background:var(--grad-fortune);color:#fff;display:flex;align-items:center;
   justify-content:center;font-size:18px;font-weight:800;
 }
+.admin-user-avatar.off{background:var(--surface-2);color:var(--text-muted)}
 .admin-user-meta{flex:1;min-width:0}
 .admin-user-name{font-size:15px;font-weight:800}
 .admin-user-email{font-size:12px;font-weight:600;color:var(--text-muted);margin-top:2px;word-break:break-all}
