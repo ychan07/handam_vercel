@@ -309,7 +309,7 @@
           </div>
           <div class="list-item">
             <div class="lead"><i class="fa-solid fa-bell"></i> 기록 알림</div>
-            <div class="switch on" onclick="toggleSwitch(event, this, '기록 알림 설정을 바꿨어요')"></div>
+            <div class="switch on" id="record-reminder-switch" data-setting="recordReminder" onclick="toggleSwitch(event, this, '기록 알림 설정을 바꿨어요')"></div>
           </div>
         </div>
       </div>
@@ -322,14 +322,14 @@
               <div class="lead"><i class="fa-solid fa-gauge-high"></i> 요약 정확도</div>
               <span class="muted" style="font-size:11px;font-weight:700">요금제에 따라 달라요</span>
             </div>
-            <div class="seg seg-elastic">
-              <button>표준</button><button class="on">고급</button><button>최고</button>
+            <div class="seg seg-elastic" data-setting-segment="summaryQuality">
+              <button data-value="표준">표준</button><button class="on" data-value="고급">고급</button><button data-value="최고">최고</button>
             </div>
           </div>
           <div class="list-item" style="flex-direction:column;align-items:stretch;gap:11px">
             <div class="lead"><i class="fa-solid fa-comment-dots"></i> AI 페르소나</div>
-            <div class="seg seg-elastic">
-              <button class="on">따뜻한 공감형</button><button>담백한 정리형</button>
+            <div class="seg seg-elastic" data-setting-segment="persona">
+              <button class="on" data-value="따뜻한 공감형">따뜻한 공감형</button><button data-value="담백한 정리형">담백한 정리형</button>
             </div>
           </div>
         </div>
@@ -352,7 +352,7 @@
         </div>
       </div>
       <p class="muted reveal" style="--d:.26s;text-align:center;font-size:11px;font-weight:600;margin-top:18px">
-        한담 v1.0.0 · 일기는 내 기기에 안전하게 보관돼요
+        한담 v1.0.0 · 설정과 일기는 계정에 안전하게 동기화돼요
       </p>
     </div>
   </div>
@@ -679,7 +679,7 @@
     </div>
     <div class="list-item" style="border:1px solid var(--border);border-radius:14px;margin-top:11px;padding:13px 16px">
       <div class="lead" style="font-size:13px"><i class="fa-solid fa-moon"></i> 음력으로 입력</div>
-      <div class="switch" onclick="toggleSwitch(event, this, '음력 입력 설정을 바꿨어요')"></div>
+      <div class="switch" id="fortune-lunar-switch" data-setting="lunarCalendar" onclick="toggleSwitch(event, this, '음력 입력 설정을 바꿨어요')"></div>
     </div>
     <button class="btn btn-primary" style="margin-top:16px" onclick="updateFortuneFromBirthday()">운세 계산하기</button>
   </div>

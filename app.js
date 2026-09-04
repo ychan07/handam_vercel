@@ -1,7 +1,7 @@
 ﻿import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { getAnalytics, isSupported as analyticsSupported } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-analytics.js";
 import { initInteractions, refreshInteractions } from "./interactions.js";
-import { initElasticSegments } from "./segment-control.js";
+import { initElasticSegments, refreshElasticSegments } from "./segment-control.js";
 import { animatePromptRefresh } from "./prompt-animations.js";
 import {
   deepMerge,
@@ -24,6 +24,20 @@ import {
   reauthenticateWithCredential,
   GoogleAuthProvider,
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+import {
+  getFirestore,
+  collection,
+  deleteDoc,
+  doc,
+  getDoc,
+  getDocs,
+  orderBy,
+  query,
+  serverTimestamp,
+  setDoc,
+  Timestamp,
+  writeBatch,
+} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyA9B9AuVV679_hy5wVLKjmIaTLb9Ly9G9U",
@@ -37,6 +51,7 @@ const firebaseConfig = {
 
 const firebaseApp = initializeApp(firebaseConfig);
 const auth = getAuth(firebaseApp);
+const firestore = getFirestore(firebaseApp);
 auth.languageCode = "ko";
 analyticsSupported()
   .then((supported) => {
@@ -54,17 +69,78 @@ const state = {
   fortune: null,
   selectedPrompt: "",
   adminUsers: [],
+  settings: null,
+  recordsSource: "none",
 };
 const googleProvider = new GoogleAuthProvider();
 const AUTH_PAGES = new Set(["login", "signup", "find-account", "admin"]);
 let presenceTimer = null;
 let dbWorker, workerSeq = 0;
+let cloudLoadUid = null;
+let cloudLoadPromise = null;
 const workerWaiters = new Map();
 const promptRotation = { default: 0 };
 let promptByMood = {};
 let emotionOptions = [];
 let fortuneData = null;
 let greetingData = null;
+
+const DEFAULT_USER_SETTINGS = Object.freeze({
+  theme: "light",
+  recordReminder: true,
+  summaryQuality: "고급",
+  persona: "따뜻한 공감형",
+  lunarCalendar: false,
+  fortuneBirthday: "",
+});
+const LEGACY_MIGRATION_MARKER = "handam-legacy-migrated-to-uid";
+
+function normalizeUserSettings(settings = {}) {
+  const theme = settings.theme === "dark" ? "dark" : "light";
+  const summaryQuality = ["표준", "고급", "최고"].includes(settings.summaryQuality)
+    ? settings.summaryQuality
+    : DEFAULT_USER_SETTINGS.summaryQuality;
+  const persona = ["따뜻한 공감형", "담백한 정리형"].includes(settings.persona)
+    ? settings.persona
+    : DEFAULT_USER_SETTINGS.persona;
+  const birthday = /^\d{4}-\d{2}-\d{2}$/.test(String(settings.fortuneBirthday || ""))
+    ? String(settings.fortuneBirthday)
+    : "";
+  return {
+    theme,
+    recordReminder: settings.recordReminder !== false,
+    summaryQuality,
+    persona,
+    lunarCalendar: Boolean(settings.lunarCalendar),
+    fortuneBirthday: birthday,
+  };
+}
+
+function settingsStorageKey(uid) { return `handam-settings-${uid || "guest"}`; }
+function recordsCacheKey(uid) { return `handam-records-${uid || "guest"}`; }
+function loadCachedSettings(uid) {
+  try {
+    return normalizeUserSettings(JSON.parse(localStorage.getItem(settingsStorageKey(uid)) || "null") || {});
+  } catch (_error) {
+    return normalizeUserSettings();
+  }
+}
+function cacheSettings(uid, settings) {
+  localStorage.setItem(settingsStorageKey(uid), JSON.stringify(normalizeUserSettings(settings)));
+}
+function cacheRecords(uid, records) {
+  localStorage.setItem(recordsCacheKey(uid), JSON.stringify(records || []));
+}
+function loadCachedRecords(uid) {
+  try {
+    const records = JSON.parse(localStorage.getItem(recordsCacheKey(uid)) || "[]");
+    return Array.isArray(records) ? records : [];
+  } catch (_error) {
+    return [];
+  }
+}
+function userDocRef(uid) { return doc(firestore, "users", uid); }
+function userDiariesRef(uid) { return collection(firestore, "users", uid, "diaries"); }
 
 function profileStorageKey(uid) { return `handam-profile-${uid || "guest"}`; }
 function loadProfile(uid) {
@@ -76,6 +152,148 @@ function saveProfile(uid, patch) {
   localStorage.setItem(profileStorageKey(uid), JSON.stringify(next));
   if (state.auth?.uid === uid) state.profile = next;
   return next;
+}
+function firestoreTimestampToIso(value, fallback = new Date().toISOString()) {
+  if (value?.toDate) return value.toDate().toISOString();
+  if (typeof value === "string") return value;
+  return fallback;
+}
+function recordFromFirestore(snapshot) {
+  const data = snapshot.data() || {};
+  return {
+    id: snapshot.id,
+    title: String(data.title || "제목 없는 기록"),
+    body: String(data.body || ""),
+    mood: String(data.mood || ""),
+    summary: String(data.summary || ""),
+    createdAt: firestoreTimestampToIso(data.createdAt),
+    entryDate: String(data.entryDate || ""),
+  };
+}
+function currentSettings() {
+  return normalizeUserSettings(state.settings || DEFAULT_USER_SETTINGS);
+}
+function applyUserSettings(settings, { applyFortune = true } = {}) {
+  const next = normalizeUserSettings(settings);
+  state.settings = next;
+  applyTheme(next.theme, { save: false });
+  document.getElementById("record-reminder-switch")?.classList.toggle("on", next.recordReminder);
+  document.getElementById("fortune-lunar-switch")?.classList.toggle("on", next.lunarCalendar);
+  document.querySelectorAll("[data-setting-segment]").forEach((segment) => {
+    const key = segment.dataset.settingSegment;
+    segment.querySelectorAll("button").forEach((button) => {
+      button.classList.toggle("on", button.dataset.value === String(next[key]));
+    });
+  });
+  if (applyFortune) {
+    state.fortuneBirthday = next.fortuneBirthday || null;
+    refreshFortune();
+    renderFortuneUI();
+    fillBirthdaySelects();
+  }
+  window.requestAnimationFrame(refreshElasticSegments);
+}
+async function saveSettingsPatch(patch, { quiet = false } = {}) {
+  const next = normalizeUserSettings({ ...currentSettings(), ...(patch || {}) });
+  applyUserSettings(next);
+  const uid = state.auth?.uid;
+  if (!uid || state.auth?.isAdmin) {
+    cacheSettings("guest", next);
+    return next;
+  }
+  cacheSettings(uid, next);
+  try {
+    await setDoc(
+      userDocRef(uid),
+      {
+        uid,
+        email: String(state.auth.email || auth.currentUser?.email || ""),
+        displayName: String(getDisplayName() || "한담").slice(0, 80),
+        settings: next,
+        migrationVersion: Number(state.profile?.migrationVersion || 0),
+        updatedAt: serverTimestamp(),
+      },
+      { merge: true }
+    );
+  } catch (error) {
+    if (!quiet) showToast("설정을 서버에 저장하지 못했어요. 연결을 확인해주세요.");
+    throw error;
+  }
+  return next;
+}
+async function migrateLegacyDiariesOnce(uid, migrationVersion = 0) {
+  if (migrationVersion >= 1) return 1;
+  const claimedBy = localStorage.getItem(LEGACY_MIGRATION_MARKER);
+  const legacyRecords = claimedBy && claimedBy !== uid ? [] : await callWorker("list");
+  const chunks = [];
+  for (let i = 0; i < legacyRecords.length; i += 400) chunks.push(legacyRecords.slice(i, i + 400));
+  for (const chunk of chunks) {
+    const batch = writeBatch(firestore);
+    for (const record of chunk) {
+      const created = new Date(record.createdAt || Date.now());
+      const safeCreated = Number.isNaN(created.getTime()) ? new Date() : created;
+      batch.set(doc(userDiariesRef(uid), `legacy-${record.id}`), {
+        uid,
+        title: String(record.title || "제목 없는 기록").slice(0, 200),
+        body: String(record.body || "").slice(0, 200000),
+        mood: String(record.mood || "평온").slice(0, 50),
+        summary: String(record.summary || "").slice(0, 10000),
+        entryDate: String(record.entryDate || toDateKey(safeCreated)).slice(0, 10),
+        createdAt: Timestamp.fromDate(safeCreated),
+        syncedAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      });
+    }
+    await batch.commit();
+  }
+  await setDoc(userDocRef(uid), { migrationVersion: 1, updatedAt: serverTimestamp() }, { merge: true });
+  if (!claimedBy && legacyRecords.length) localStorage.setItem(LEGACY_MIGRATION_MARKER, uid);
+  if (state.profile) state.profile.migrationVersion = 1;
+  return 1;
+}
+async function loadCloudUserData(user) {
+  const uid = user.uid;
+  const cached = loadCachedSettings(uid);
+  applyUserSettings(cached);
+  let userData = {};
+  try {
+    const snapshot = await getDoc(userDocRef(uid));
+    userData = snapshot.exists() ? snapshot.data() : {};
+    const settings = normalizeUserSettings({
+      ...cached,
+      ...(userData.settings || {}),
+      fortuneBirthday: userData.settings?.fortuneBirthday || cached.fortuneBirthday || loadFortuneBirthday() || "",
+    });
+    state.profile = {
+      ...(state.profile || {}),
+      displayName: userData.displayName || user.displayName || state.profile?.displayName || "한담",
+      email: userData.email || user.email || state.profile?.email || "",
+      migrationVersion: Number(userData.migrationVersion || 0),
+    };
+    cacheSettings(uid, settings);
+    applyUserSettings(settings);
+    await setDoc(
+      userDocRef(uid),
+      {
+        uid,
+        email: String(user.email || state.profile.email || ""),
+        displayName: String(state.profile.displayName || "한담").slice(0, 80),
+        settings,
+        migrationVersion: Number(userData.migrationVersion || 0),
+        updatedAt: serverTimestamp(),
+      },
+      { merge: true }
+    );
+    await migrateLegacyDiariesOnce(uid, Number(userData.migrationVersion || 0));
+    await reloadRecords();
+  } catch (error) {
+    console.error("Firestore 사용자 데이터 로드 실패", error);
+    state.records = loadCachedRecords(uid);
+    state.recordsSource = "cache";
+    renderRecordsUI();
+    showToast("클라우드 데이터를 불러오지 못해 이 기기의 캐시를 표시해요.");
+  }
+  updateUserUI();
 }
 function getDisplayName() {
   const p = state.profile;
@@ -464,7 +682,8 @@ function updateBackupStats() {
   const el = document.getElementById("backup-local-desc");
   if (!el) return;
   const count = state.records.length;
-  el.textContent = `일기 ${count}편 · 이 기기에 저장됨`;
+  const location = state.recordsSource === "firestore" ? "계정에 동기화됨" : "이 기기 캐시에 저장됨";
+  el.textContent = `일기 ${count}편 · ${location}`;
 }
 function updateDiaryStatsUI() {
   updateHomeWeekDiary();
@@ -625,7 +844,11 @@ async function setAuthFromUser(user) {
   if (!state.profile?.email && user.email) patch.email = user.email;
   if (Object.keys(patch).length) state.profile = saveProfile(user.uid, patch);
   localStorage.setItem("handam-auth", JSON.stringify(state.auth));
-  updateUserUI();
+  if (cloudLoadUid !== user.uid || !cloudLoadPromise) {
+    cloudLoadUid = user.uid;
+    cloudLoadPromise = loadCloudUserData(user);
+  }
+  await cloudLoadPromise;
   startPresenceHeartbeat();
 }
 function authErrorMessage(error, context = {}) {
@@ -678,9 +901,29 @@ function go(id) {
   if (id === "backup") updateBackupStats();
   if (id === "admin") loadAdminDashboard();
 }
-function applyTheme(t) { document.documentElement.setAttribute("data-theme", t); document.getElementById("theme-btn").innerHTML = t === "dark" ? '<i class="fa-solid fa-sun"></i>' : '<i class="fa-solid fa-moon"></i>'; const darkSwitch = document.getElementById("dark-switch"); if (darkSwitch) darkSwitch.classList.toggle("on", t === "dark"); localStorage.setItem("handam-theme", t); }
-function toggleTheme(event) { if (event) event.stopPropagation(); const cur = document.documentElement.getAttribute("data-theme"); applyTheme(cur === "dark" ? "light" : "dark"); }
-function toggleSwitch(event, element, message) { if (event) event.stopPropagation(); element.classList.toggle("on"); if (message) showToast(message); }
+function applyTheme(t, { save = true } = {}) {
+  const theme = t === "dark" ? "dark" : "light";
+  document.documentElement.setAttribute("data-theme", theme);
+  const themeBtn = document.getElementById("theme-btn");
+  if (themeBtn) themeBtn.innerHTML = theme === "dark" ? '<i class="fa-solid fa-sun"></i>' : '<i class="fa-solid fa-moon"></i>';
+  document.getElementById("dark-switch")?.classList.toggle("on", theme === "dark");
+  localStorage.setItem("handam-theme", theme);
+  if (save && state.settings) saveSettingsPatch({ theme }).catch(() => {});
+}
+function toggleTheme(event) {
+  if (event) event.stopPropagation();
+  const cur = document.documentElement.getAttribute("data-theme");
+  applyTheme(cur === "dark" ? "light" : "dark");
+  showToast("화면 설정을 저장했어요.");
+}
+function toggleSwitch(event, element, message) {
+  if (event) event.stopPropagation();
+  const enabled = !element.classList.contains("on");
+  element.classList.toggle("on", enabled);
+  const setting = element.dataset.setting;
+  if (setting) saveSettingsPatch({ [setting]: enabled }).catch(() => {});
+  if (message) showToast(message);
+}
 function showToast(message) {
   const toast = document.getElementById("toast");
   const duration = getAnimations().toast?.durationMs ?? 1900;
@@ -820,16 +1063,49 @@ async function saveManualDiary() {
   if (!body) return showToast("본문을 입력해주세요.");
   const mood = formatMoodForSave(getSelectedMood("#manual-mood"));
   let summary = body;
-  try { const ai = await apiPost("/api/llm/summarize", { text: body }); summary = ai.summary || summary; } catch (_error) {}
-  const result = await callWorker("insert", {
-    title,
-    body,
-    mood,
-    summary,
-    createdAt: new Date().toISOString(),
-    entryDate: diaryEntryDate(),
-  });
-  persistSerialized(result); await reloadRecords(); showToast("직접 입력 일기를 저장했어요."); go("records");
+  const settings = currentSettings();
+  try {
+    const ai = await apiPost("/api/llm/summarize", {
+      text: body,
+      persona: settings.persona,
+      quality: settings.summaryQuality,
+    });
+    summary = ai.summary || summary;
+  } catch (_error) {}
+  const uid = state.auth?.uid;
+  try {
+    if (uid && !state.auth?.isAdmin) {
+      const recordRef = doc(userDiariesRef(uid));
+      const now = new Date();
+      await setDoc(recordRef, {
+        uid,
+        title: title.slice(0, 200),
+        body: body.slice(0, 200000),
+        mood: mood.slice(0, 50),
+        summary: String(summary).slice(0, 10000),
+        createdAt: Timestamp.fromDate(now),
+        entryDate: diaryEntryDate(now),
+        syncedAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      });
+    } else {
+      const result = await callWorker("insert", {
+        title,
+        body,
+        mood,
+        summary,
+        createdAt: new Date().toISOString(),
+        entryDate: diaryEntryDate(),
+      });
+      persistSerialized(result);
+    }
+    await reloadRecords();
+    showToast("일기를 계정에 저장했어요.");
+    go("records");
+  } catch (error) {
+    console.error("일기 저장 실패", error);
+    showToast("일기를 저장하지 못했어요. 연결을 확인해주세요.");
+  }
 }
 
 function renderPromptRecommendations() {
@@ -920,18 +1196,48 @@ function renderRecordsPage() {
   refreshInteractions();
 }
 async function reloadRecords() {
-  state.records = await callWorker("list");
+  const uid = state.auth?.uid;
+  if (uid && !state.auth?.isAdmin) {
+    const snapshots = await getDocs(query(userDiariesRef(uid), orderBy("createdAt", "desc")));
+    state.records = snapshots.docs.map(recordFromFirestore);
+    state.recordsSource = "firestore";
+    cacheRecords(uid, state.records);
+  } else {
+    state.records = await callWorker("list");
+    state.recordsSource = "local";
+  }
   for (const record of state.records) {
     if (!record.entryDate && record.createdAt) {
       record.entryDate = toDateKey(new Date(record.createdAt));
     }
   }
+  renderRecordsUI();
+}
+function renderRecordsUI() {
   renderHomeRecords();
   renderRecordsPage();
   renderPromptRecommendations();
   updateDiaryStatsUI();
 }
-async function deleteCurrentRecord() { if (!state.selectedRecordId) return; const result = await callWorker("delete", { id: state.selectedRecordId }); persistSerialized(result); state.selectedRecordId = null; await reloadRecords(); showToast("기록을 삭제했어요."); go("records"); }
+async function deleteCurrentRecord() {
+  if (!state.selectedRecordId) return;
+  try {
+    const uid = state.auth?.uid;
+    if (uid && !state.auth?.isAdmin) {
+      await deleteDoc(doc(userDiariesRef(uid), String(state.selectedRecordId)));
+    } else {
+      const result = await callWorker("delete", { id: state.selectedRecordId });
+      persistSerialized(result);
+    }
+    state.selectedRecordId = null;
+    await reloadRecords();
+    showToast("기록을 삭제했어요.");
+    go("records");
+  } catch (error) {
+    console.error("일기 삭제 실패", error);
+    showToast("기록을 삭제하지 못했어요.");
+  }
+}
 
 async function loginAsAdmin(username, password) {
   const data = await apiPost("/api/admin/login", { username, password });
@@ -1047,9 +1353,15 @@ async function logout() {
   state.profile = null;
   state.admin = null;
   state.adminUsers = [];
+  state.settings = normalizeUserSettings();
+  state.records = [];
+  state.recordsSource = "none";
+  cloudLoadUid = null;
+  cloudLoadPromise = null;
   localStorage.removeItem("handam-auth");
   sessionStorage.removeItem("handam-admin");
   stopPresenceHeartbeat();
+  renderRecordsUI();
   updateUserUI();
   showToast("로그아웃했어요.");
   go("login");
@@ -1057,6 +1369,11 @@ async function logout() {
 function adminLogout() {
   state.admin = null;
   state.auth = null;
+  state.settings = normalizeUserSettings();
+  state.records = [];
+  state.recordsSource = "none";
+  cloudLoadUid = null;
+  cloudLoadPromise = null;
   sessionStorage.removeItem("handam-admin");
   showToast("관리자 로그아웃했어요.");
   go("login");
@@ -1442,6 +1759,7 @@ function loadFortuneBirthday() {
 function saveFortuneBirthday(birthday) {
   localStorage.setItem(FORTUNE_BIRTHDAY_KEY, birthday);
   state.fortuneBirthday = birthday;
+  if (state.settings) saveSettingsPatch({ fortuneBirthday: birthday }).catch(() => {});
 }
 function refreshFortune() {
   if (!state.fortuneBirthday) {
@@ -1606,7 +1924,7 @@ function updateFortuneFromBirthday() {
   showFortuneCalculatingLoader(birthday, completeFortuneCalculation);
 }
 function initFortune() {
-  state.fortuneBirthday = loadFortuneBirthday();
+  state.fortuneBirthday = currentSettings().fortuneBirthday || loadFortuneBirthday();
   refreshFortune();
   renderFortuneUI();
 }
@@ -1625,6 +1943,10 @@ function bindSegmentButtons() {
     seg.addEventListener("click", (e) => {
       const btn = e.target.closest("button");
       if (!btn) return;
+      const setting = seg.dataset.settingSegment;
+      if (setting && btn.dataset.value) {
+        saveSettingsPatch({ [setting]: btn.dataset.value }).catch(() => {});
+      }
       showToast(`${btn.textContent.trim()} 설정을 적용했어요`);
     });
   });
@@ -1668,7 +1990,9 @@ function bindFindAccountTabs() {
 })();
 
 (async function bootstrap() {
-  applyTheme(localStorage.getItem("handam-theme") || "light");
+  state.settings = loadCachedSettings("guest");
+  state.settings.theme = localStorage.getItem("handam-theme") || state.settings.theme;
+  applyUserSettings(state.settings, { applyFortune: false });
   await loadAppData();
   bindSegmentButtons(); bindFindAccountTabs(); bindAdminControls();
   bindHomeWeekStrip();
@@ -1685,25 +2009,44 @@ function bindFindAccountTabs() {
   });
   window.addEventListener("pageshow", refreshHomeIfDateChanged);
   window.setInterval(refreshHomeIfDateChanged, 60_000);
-  await initWorker(); await reloadRecords();
+  await initWorker();
+  state.records = [];
+  state.recordsSource = "none";
+  renderRecordsUI();
   lastHomeDiaryDateKey = diaryEntryDate();
-  onAuthStateChanged(auth, async (user) => {
-    if (!user || state.auth?.isAdmin) return;
-    await setAuthFromUser(user);
-    if (["login", "signup", "find-account"].includes(currentPageId())) go("home");
-  });
   try { state.admin = JSON.parse(sessionStorage.getItem("handam-admin") || "null"); } catch (_error) { state.admin = null; }
-  try { state.auth = JSON.parse(localStorage.getItem("handam-auth") || "null"); } catch (_error) { state.auth = null; }
-  if (state.auth?.uid && !state.auth.isAdmin) state.profile = loadProfile(state.auth.uid);
-  updateUserUI();
   if (state.admin?.token) {
     state.auth = { uid: "admin", isAdmin: true };
+    updateUserUI();
     go("admin");
-  } else if (state.auth && !state.auth.isAdmin) {
-    startPresenceHeartbeat();
-    go("home");
   } else {
-    go("login");
+    await new Promise((resolve) => {
+      let firstEvent = true;
+      onAuthStateChanged(auth, async (user) => {
+        if (state.auth?.isAdmin) {
+          if (firstEvent) { firstEvent = false; resolve(); }
+          return;
+        }
+        if (user) {
+          await setAuthFromUser(user);
+          if (["login", "signup", "find-account"].includes(currentPageId()) || firstEvent) go("home");
+        } else {
+          state.auth = null;
+          state.profile = null;
+          state.records = [];
+          state.recordsSource = "none";
+          cloudLoadUid = null;
+          cloudLoadPromise = null;
+          renderRecordsUI();
+          updateUserUI();
+          go("login");
+        }
+        if (firstEvent) {
+          firstEvent = false;
+          resolve();
+        }
+      });
+    });
   }
 })();
 

@@ -12,6 +12,7 @@ ENV/
 api_key.txt
 config.json
 *.log
+.firestore-analysis.md
 
 # Dependencies
 node_modules/

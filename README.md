@@ -9,9 +9,11 @@ AI 기술(OCR, LLM)을 활용하여 사용자의 아날로그 감성(손글씨 �
     1.  **이미지 입력**: 모바일 환경 최적화 업로드 (Camera API 활용).
     2.  **OCR (Naver Clova)**: 텍스트 추출.
     3.  **LLM 정규화 및 요약 (Gemini)**: 오타 교정 및 사용자 설정(페르소나)에 따른 요약.
-*   **데이터 저장 (Local-First)**:
-    *   **추천 DB**: **SQLite (Wasm/Origin Private File System)** 또는 **IndexedDB (Dexie.js/PouchDB)**.
-    *   **이유**: 일기 데이터의 무결성과 복잡한 쿼리(검색, 필터링)를 위해 관계형 구조를 지원하는 SQLite Wasm 방식을 추천합니다. 로컬 저장만으로도 앱과 같은 빠른 성능을 제공합니다.
+*   **데이터 저장 (계정 동기화)**:
+    *   Firebase Authentication UID별로 `users/{uid}/diaries`에 일기를 저장합니다.
+    *   `users/{uid}`에는 화면·알림·AI 페르소나·운세 입력 설정을 저장합니다.
+    *   마지막으로 불러온 데이터는 UID별 `localStorage` 캐시에 남겨 일시적인 네트워크 오류에도 표시합니다.
+    *   기존 `handam-sqlite` 일기는 최초 로그인 사용자에게 한 번만 마이그레이션됩니다.
 
 ### 2. LLM 기반 개인 맞춤형 글감 추천
 *   **방법론**: 사용자의 **누적된 일기 요약 데이터**를 컨텍스트로 LLM에 전달.
@@ -87,18 +89,26 @@ npm run start
    - 프로젝트 설정 > 일반 > 웹 앱 구성에서 `apiKey` 확인
    - 값을 `.env`의 `FIREBASE_WEB_API_KEY`에 입력
 
-4. 환경 변수 작성
+4. Firebase CLI 로그인
+   - `npx -y firebase-tools@latest login`
+   - 원격/헤드리스 환경이면 `--no-localhost` 옵션 사용
+
+5. Firestore 생성 및 보안 규칙 배포
+   - Firebase Console에서 Cloud Firestore 데이터베이스를 생성
+   - 프로젝트 루트에서 아래 명령 실행:
+     ```bash
+     npx -y firebase-tools@latest deploy --only firestore:rules --project handam-981b6
+     ```
+   - `firestore.rules`는 로그인한 사용자가 자기 `users/{uid}` 경로만 읽고 쓰도록 제한합니다.
+
+6. 환경 변수 작성
    - `.env.example`을 `.env`로 복사하고 모든 키 채우기
    - 아래 명령으로 누락 키 확인:
      ```bash
      npm run verify:env
      ```
 
-5. Firebase CLI 로그인(선택, 배포/운영용)
-   - `npx -y firebase-tools@latest login`
-   - 원격/헤드리스 환경이면 `--no-localhost` 옵션 사용
-
-6. 앱 실행 및 인증 테스트
+7. 앱 실행 및 인증 테스트
    - `npm run start`
    - 로그인/회원가입 테스트
    - 비밀번호 변경 테스트
