@@ -11,7 +11,8 @@
     "predev": "npm run build:ui",
     "start:next": "next start",
     "lint": "next lint",
-    "verify:env": "node scripts/verify-env.cjs"
+    "verify:env": "node scripts/verify-env.cjs",
+    "verify:services": "node scripts/verify-services.cjs"
   },
   "dependencies": {
     "clsx": "^2.1.1",

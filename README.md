@@ -64,6 +64,7 @@ AI 기술(OCR, LLM)을 활용하여 사용자의 아날로그 감성(손글씨 �
 - `FIREBASE_WEB_API_KEY`: Firebase Authentication REST API 키
 - `CLOVA_OCR_INVOKE_URL`, `CLOVA_OCR_SECRET`: Naver Clova OCR 호출 정보
 - `GEMINI_API_KEY`: Gemini 요약 생성용 API 키
+- `GEMINI_MODEL`: Gemini 모델명(선택, 기본값 `gemini-2.5-flash`)
 - `FORTUNE_API_URL`: 운세 API URL (`{birthday}` 치환 지원)
 
 실행:
@@ -93,13 +94,14 @@ npm run start
    - `npx -y firebase-tools@latest login`
    - 원격/헤드리스 환경이면 `--no-localhost` 옵션 사용
 
-5. Firestore 생성 및 보안 규칙 배포
-   - Firebase Console에서 Cloud Firestore 데이터베이스를 생성
+5. Firestore 연결 및 규칙/인덱스 배포
+   - 기본 대상은 `.firebaserc`에 지정된 `handam-981b6` 프로젝트의 `(default)` 데이터베이스입니다.
    - 프로젝트 루트에서 아래 명령 실행:
      ```bash
-     npx -y firebase-tools@latest deploy --only firestore:rules --project handam-981b6
+     npx -y firebase-tools@latest deploy --only firestore --project handam-981b6
      ```
-   - `firestore.rules`는 로그인한 사용자가 자기 `users/{uid}` 경로만 읽고 쓰도록 제한합니다.
+   - `firestore.rules`는 로그인한 사용자가 자기 `users/{uid}`와 `users/{uid}/diaries/{diaryId}` 경로만 읽고 쓰도록 제한합니다.
+   - `firestore.indexes.json`은 조회하지 않는 큰 일기 본문/요약 필드의 인덱스를 제외합니다.
 
 6. 환경 변수 작성
    - `.env.example`을 `.env`로 복사하고 모든 키 채우기
@@ -138,9 +140,12 @@ Vercel 프로젝트 대시보드에서 아래 경로로 이동:
 다음 키를 **Production / Preview / Development**(필요한 환경만) 에 입력:
 
 - `FIREBASE_WEB_API_KEY`
+- `FIREBASE_SERVICE_ACCOUNT` (Firebase 서비스 계정 JSON 전체를 한 줄로 입력)
+- `ADMIN_JWT_SECRET`
 - `CLOVA_OCR_INVOKE_URL`
 - `CLOVA_OCR_SECRET`
 - `GEMINI_API_KEY`
+- `GEMINI_MODEL` (선택, 기본값 `gemini-2.5-flash`)
 - `FORTUNE_API_URL`
 - `PORT` (선택, Vercel에서는 보통 불필요)
 
@@ -164,3 +169,11 @@ Google 로그인의 `unauthorized domain` 오류를 막으려면 Firebase Consol
 - 또는 CLI 사용 시 `vercel --prod`
 
 배포 후 Google 로그인, OCR, 요약, 운세 API를 순서대로 점검하세요.
+
+환경변수는 브라우저 번들에 포함되지 않으며 `/api/ocr`, `/api/llm/summarize` 서버리스 함수에서만 읽습니다. OCR은 `CLOVA_OCR_INVOKE_URL`과 `CLOVA_OCR_SECRET` 두 값이 모두 필요하고, Gemini는 `GEMINI_API_KEY`만 필수입니다.
+
+외부 서비스 호출 형식은 실제 키를 노출하지 않는 어댑터 검사로 확인할 수 있습니다.
+
+```bash
+npm run verify:services
+```

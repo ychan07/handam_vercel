@@ -1,7 +1,13 @@
 const crypto = require("crypto");
 
 function sendJson(res, statusCode, body) {
-  res.status(statusCode).json(body);
+  if (typeof res.status === "function" && typeof res.json === "function") {
+    res.status(statusCode).json(body);
+    return;
+  }
+  res.statusCode = statusCode;
+  res.setHeader("Content-Type", "application/json; charset=utf-8");
+  res.end(JSON.stringify(body));
 }
 
 async function readBody(req) {

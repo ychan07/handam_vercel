@@ -1,4 +1,13 @@
 const { crypto, sendJson, readBody, requestJson, requirePost } = require("./_lib");
+const { resolvePersona } = require("./personas");
+
+const GEMINI_MODEL_PATTERN = /^[a-zA-Z0-9._-]{1,100}$/;
+const SUMMARY_QUALITIES = new Set(["표준", "고급", "최고"]);
+
+function getGeminiModel() {
+  const configured = String(process.env.GEMINI_MODEL || "gemini-2.5-flash").trim();
+  return GEMINI_MODEL_PATTERN.test(configured) ? configured : "gemini-2.5-flash";
+}
 
 function getAction(req, body) {
   try {
@@ -30,11 +39,10 @@ function extractOcrText(data) {
   for (const field of fields) {
     const piece = String(field.inferText).trim();
     if (!piece) continue;
-    if (field.lineBreak && current) {
+    current = current ? `${current} ${piece}` : piece;
+    if (field.lineBreak) {
       lines.push(current);
-      current = piece;
-    } else {
-      current = current ? `${current} ${piece}` : piece;
+      current = "";
     }
   }
   if (current) lines.push(current);
@@ -42,8 +50,12 @@ function extractOcrText(data) {
 }
 
 async function handleOcr(res, body) {
-  const { imageBase64, format: formatHint } = body;
+  const imageBase64 = String(body.imageBase64 || "").trim();
+  const formatHint = body.format;
   if (!imageBase64) return sendJson(res, 400, { error: "imageBase64 is required" });
+  if (imageBase64.length > 4_500_000) {
+    return sendJson(res, 413, { error: "OCR 이미지는 4.5MB 이하로 업로드해 주세요." });
+  }
   const invokeUrl = process.env.CLOVA_OCR_INVOKE_URL;
   const secret = process.env.CLOVA_OCR_SECRET;
   if (!invokeUrl || !secret) {
@@ -54,7 +66,9 @@ async function handleOcr(res, body) {
     version: "V2",
     requestId: crypto.randomUUID(),
     timestamp: Date.now(),
+    lang: "ko",
     images: [{ format, name: "diary", data: imageBase64 }],
+    enableTableDetection: false,
   };
   const data = await requestJson(invokeUrl, {
     method: "POST",
@@ -65,27 +79,36 @@ async function handleOcr(res, body) {
   if (!text) {
     return sendJson(res, 422, { error: "인식된 글자가 없어요. 밝은 곳에서 다시 촬영해 주세요." });
   }
-  sendJson(res, 200, { text, raw: data });
+  sendJson(res, 200, { text });
 }
 
 async function handleSummarize(res, body) {
-  const { text, persona = "따뜻한 공감형", quality = "고급" } = body;
+  const text = String(body.text || "").trim();
+  const persona = resolvePersona(String(body.persona || ""));
+  const quality = SUMMARY_QUALITIES.has(body.quality) ? body.quality : "고급";
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) return sendJson(res, 500, { error: "Missing GEMINI_API_KEY in env" });
   if (!text) return sendJson(res, 400, { error: "text is required" });
+  if (text.length > 200_000) return sendJson(res, 413, { error: "요약할 글이 너무 깁니다." });
+  const model = getGeminiModel();
   const prompt = [
     "당신은 한국어 일기 도우미입니다.",
-    `페르소나: ${persona}`,
+    `페르소나: ${persona.name}`,
+    `행동 지침: ${persona.instruction}`,
     `요약 정확도: ${quality}`,
+    "원문의 개인정보나 민감한 내용을 새로 추측하거나 만들어내지 마세요.",
     "입력 텍스트를 맞춤법/문장 부호를 자연스럽게 정리하고, 핵심을 한 줄로 요약하세요.",
     "JSON만 반환하세요. 형식: {\"cleanedText\":\"...\",\"summary\":\"...\"}",
     `입력: ${text}`,
   ].join("\n");
   const data = await requestJson(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
+    `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`,
     {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        "x-goog-api-key": apiKey,
+      },
       body: JSON.stringify({
         contents: [{ parts: [{ text: prompt }] }],
         generationConfig: { responseMimeType: "application/json" },
@@ -94,9 +117,22 @@ async function handleSummarize(res, body) {
   );
   const output = data?.candidates?.[0]?.content?.parts?.[0]?.text || "{\"cleanedText\":\"\",\"summary\":\"\"}";
   try {
-    sendJson(res, 200, JSON.parse(output));
+    const parsed = JSON.parse(output);
+    sendJson(res, 200, {
+      cleanedText: String(parsed.cleanedText || text),
+      summary: String(parsed.summary || ""),
+      persona: persona.name,
+      quality,
+      model,
+    });
   } catch (_error) {
-    sendJson(res, 200, { cleanedText: text, summary: output });
+    sendJson(res, 200, {
+      cleanedText: text,
+      summary: String(output),
+      persona: persona.name,
+      quality,
+      model,
+    });
   }
 }
 

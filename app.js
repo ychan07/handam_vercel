@@ -166,6 +166,10 @@ function recordFromFirestore(snapshot) {
     body: String(data.body || ""),
     mood: String(data.mood || ""),
     summary: String(data.summary || ""),
+    aiPersona: String(data.aiPersona || ""),
+    aiModel: String(data.aiModel || ""),
+    summaryQuality: String(data.summaryQuality || ""),
+    summaryGenerated: Boolean(data.summaryGenerated),
     createdAt: firestoreTimestampToIso(data.createdAt),
     entryDate: String(data.entryDate || ""),
   };
@@ -226,6 +230,7 @@ async function migrateLegacyDiariesOnce(uid, migrationVersion = 0) {
   const claimedBy = localStorage.getItem(LEGACY_MIGRATION_MARKER);
   const legacyRecords = claimedBy && claimedBy !== uid ? [] : await callWorker("list");
   const chunks = [];
+  const settings = currentSettings();
   for (let i = 0; i < legacyRecords.length; i += 400) chunks.push(legacyRecords.slice(i, i + 400));
   for (const chunk of chunks) {
     const batch = writeBatch(firestore);
@@ -238,6 +243,10 @@ async function migrateLegacyDiariesOnce(uid, migrationVersion = 0) {
         body: String(record.body || "").slice(0, 200000),
         mood: String(record.mood || "평온").slice(0, 50),
         summary: String(record.summary || "").slice(0, 10000),
+        aiPersona: settings.persona,
+        aiModel: "",
+        summaryQuality: settings.summaryQuality,
+        summaryGenerated: false,
         entryDate: String(record.entryDate || toDateKey(safeCreated)).slice(0, 10),
         createdAt: Timestamp.fromDate(safeCreated),
         syncedAt: serverTimestamp(),
@@ -317,9 +326,12 @@ async function adminApi(path, payload) {
 async function sendPresenceHeartbeat() {
   if (!state.auth?.uid || state.auth.isLocalAdmin || state.auth.isAdmin) return;
   try {
+    const user = auth.currentUser;
+    if (!user) return;
+    const idToken = await user.getIdToken();
+    state.auth.idToken = idToken;
     await apiPost("/api/presence", {
-      uid: state.auth.uid,
-      email: state.auth.email || null,
+      idToken,
       displayName: getDisplayName(),
     });
   } catch (_e) {}
@@ -1064,6 +1076,8 @@ async function saveManualDiary() {
   const mood = formatMoodForSave(getSelectedMood("#manual-mood"));
   let summary = body;
   const settings = currentSettings();
+  let aiModel = "";
+  let summaryGenerated = false;
   try {
     const ai = await apiPost("/api/llm/summarize", {
       text: body,
@@ -1071,6 +1085,8 @@ async function saveManualDiary() {
       quality: settings.summaryQuality,
     });
     summary = ai.summary || summary;
+    aiModel = String(ai.model || "").slice(0, 100);
+    summaryGenerated = Boolean(ai.summary);
   } catch (_error) {}
   const uid = state.auth?.uid;
   try {
@@ -1083,6 +1099,10 @@ async function saveManualDiary() {
         body: body.slice(0, 200000),
         mood: mood.slice(0, 50),
         summary: String(summary).slice(0, 10000),
+        aiPersona: settings.persona,
+        aiModel,
+        summaryQuality: settings.summaryQuality,
+        summaryGenerated,
         createdAt: Timestamp.fromDate(now),
         entryDate: diaryEntryDate(now),
         syncedAt: serverTimestamp(),

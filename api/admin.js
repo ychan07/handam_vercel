@@ -9,7 +9,7 @@ const {
   setUserDisabled,
   deleteUser,
   createPasswordResetLink,
-  touchPresence,
+  recordVerifiedPresence,
   hasFirebaseAdmin,
 } = require("./_adminCore");
 
@@ -37,12 +37,14 @@ module.exports = async function handler(req, res) {
     }
 
     if (action === "presence") {
-      const { uid, email, displayName } = body;
-      if (!uid) return sendJson(res, 400, { error: "uid is required" });
-      if (hasFirebaseAdmin()) {
-        await touchPresence(uid, { email: email || null, displayName: displayName || null });
+      const { idToken, displayName } = body;
+      if (!idToken || typeof idToken !== "string") {
+        return sendJson(res, 401, { error: "Firebase 로그인이 필요합니다." });
       }
-      return sendJson(res, 200, { ok: true });
+      if (!hasFirebaseAdmin()) {
+        return sendJson(res, 503, { error: "FIREBASE_SERVICE_ACCOUNT가 설정되지 않았습니다." });
+      }
+      return sendJson(res, 200, await recordVerifiedPresence(idToken, { displayName }));
     }
 
     const { adminToken } = body;
@@ -85,6 +87,9 @@ module.exports = async function handler(req, res) {
       return sendJson(res, 401, { error: error.message || "Unauthorized" });
     }
     const msg = error.message || "Server error";
+    if (action === "presence" && (String(error.code || "").startsWith("auth/") || /Firebase 로그인/.test(msg))) {
+      return sendJson(res, 401, { error: "유효한 Firebase 로그인이 필요합니다." });
+    }
     const status = /비밀번호|아이디|필요|만료/.test(msg) ? 400 : 500;
     const friendly =
       /EROFS|read-only|EPERM|EACCES/i.test(msg)

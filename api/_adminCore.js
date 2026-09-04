@@ -209,6 +209,24 @@ async function touchPresence(uid, payload = {}) {
   }
 }
 
+async function recordVerifiedPresence(idToken, payload = {}) {
+  if (!hasFirebaseAdmin()) {
+    throw new Error("FIREBASE_SERVICE_ACCOUNT가 설정되지 않았습니다.");
+  }
+  if (!idToken || typeof idToken !== "string") {
+    throw new Error("Firebase 로그인이 필요합니다.");
+  }
+  const decoded = await getAuth().verifyIdToken(idToken);
+  const tokenName = typeof decoded.name === "string" ? decoded.name : "";
+  const requestedName = typeof payload.displayName === "string" ? payload.displayName : "";
+  const displayName = (requestedName || tokenName).trim().slice(0, 80) || null;
+  await touchPresence(decoded.uid, {
+    email: typeof decoded.email === "string" ? decoded.email.slice(0, 254) : null,
+    displayName,
+  });
+  return { ok: true };
+}
+
 async function getAdminStats() {
   const users = await listFirebaseUsers();
   const { map: presence, firestoreEnabled } = await getPresenceMap();
@@ -301,6 +319,7 @@ module.exports = {
   deleteUser,
   createPasswordResetLink,
   touchPresence,
+  recordVerifiedPresence,
   hasFirebaseAdmin,
   loadAdminConfig,
 };
