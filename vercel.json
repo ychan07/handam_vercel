@@ -8,6 +8,7 @@
     { "source": "/api/auth/register", "destination": "/api/auth?action=register" },
     { "source": "/api/auth/change-password", "destination": "/api/auth?action=change-password" },
     { "source": "/api/admin/login", "destination": "/api/admin?action=login" },
+    { "source": "/api/admin/overview", "destination": "/api/admin?action=overview" },
     { "source": "/api/admin/stats", "destination": "/api/admin?action=stats" },
     { "source": "/api/admin/users", "destination": "/api/admin?action=users" },
     { "source": "/api/admin/reset-password", "destination": "/api/admin?action=reset-password" },

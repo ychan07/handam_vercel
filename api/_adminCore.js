@@ -7,6 +7,9 @@ const CONFIG_PATH = path.join(__dirname, "data", "admin-config.json");
 const PRESENCE_COLLECTION = "handam_presence";
 const ADMIN_DOC = "handam_admin/config";
 const ACTIVE_WINDOW_MS = 15 * 60 * 1000;
+// 유저가 늘어나도 서버리스 함수가 타임아웃되지 않도록 1회 스캔 상한과 캐시를 둔다.
+const MAX_SCAN_USERS = 5000;
+const SNAPSHOT_TTL_MS = 20 * 1000;
 
 function jwtSecret() {
   return process.env.ADMIN_JWT_SECRET || "handam-dev-admin-secret-change-me";
@@ -153,16 +156,21 @@ async function changeAdminCredentials(adminToken, currentPassword, newUsername, 
 }
 
 async function listFirebaseUsers() {
-  if (!hasFirebaseAdmin()) return [];
+  if (!hasFirebaseAdmin()) return { users: [], truncated: false };
   const auth = getAuth();
   const users = [];
   let pageToken;
+  let truncated = false;
   do {
     const result = await auth.listUsers(1000, pageToken);
     users.push(...result.users);
     pageToken = result.pageToken;
+    if (pageToken && users.length >= MAX_SCAN_USERS) {
+      truncated = true;
+      break;
+    }
   } while (pageToken);
-  return users;
+  return { users, truncated };
 }
 
 async function getPresenceMap() {
@@ -209,9 +217,27 @@ async function touchPresence(uid, payload = {}) {
   }
 }
 
-async function getAdminStats() {
-  const users = await listFirebaseUsers();
-  const { map: presence, firestoreEnabled } = await getPresenceMap();
+// Auth 목록 + presence를 한 번만 훑어 캐시한다. 유저 수가 늘수록 스캔 비용이 커지므로
+// stats/users를 따로 호출해도 같은 스냅샷을 재사용한다.
+let snapshotCache = null;
+
+function invalidateAdminSnapshot() {
+  snapshotCache = null;
+}
+
+async function getAdminSnapshot(force = false) {
+  const now = Date.now();
+  if (!force && snapshotCache && now - snapshotCache.at < SNAPSHOT_TTL_MS) return snapshotCache;
+  const [{ users, truncated }, { map: presence, firestoreEnabled }] = await Promise.all([
+    listFirebaseUsers(),
+    getPresenceMap(),
+  ]);
+  snapshotCache = { users, truncated, presence, firestoreEnabled, at: now };
+  return snapshotCache;
+}
+
+function buildStats(snapshot) {
+  const { users, presence, firestoreEnabled, truncated } = snapshot;
   const now = Date.now();
   let activeCount = 0;
   for (const user of users) {
@@ -228,12 +254,14 @@ async function getAdminStats() {
     firebaseConfigured: hasFirebaseAdmin(),
     firestoreEnabled,
     activeSource: firestoreEnabled ? "presence" : "lastSignIn",
+    truncated,
+    scanLimit: MAX_SCAN_USERS,
+    fetchedAt: new Date(snapshot.at).toISOString(),
   };
 }
 
-async function getAdminUsers() {
-  const users = await listFirebaseUsers();
-  const { map: presence, firestoreEnabled } = await getPresenceMap();
+function buildUserRows(snapshot) {
+  const { users, presence } = snapshot;
   const now = Date.now();
   return users.map((user) => {
     const entry = presence[user.uid];
@@ -254,12 +282,27 @@ async function getAdminUsers() {
   });
 }
 
+async function getAdminStats(force = false) {
+  return buildStats(await getAdminSnapshot(force));
+}
+
+async function getAdminUsers(force = false) {
+  return buildUserRows(await getAdminSnapshot(force));
+}
+
+// 대시보드 진입 시 stats와 users를 한 번의 스캔으로 함께 돌려준다.
+async function getAdminOverview(force = false) {
+  const snapshot = await getAdminSnapshot(force);
+  return { stats: buildStats(snapshot), users: buildUserRows(snapshot) };
+}
+
 async function resetUserPassword(uid, newPassword) {
   if (!hasFirebaseAdmin()) throw new Error("FIREBASE_SERVICE_ACCOUNT가 설정되지 않았습니다.");
   if (!uid || !newPassword || newPassword.length < 6) {
     throw new Error("uid와 6자 이상의 새 비밀번호가 필요합니다.");
   }
   await getAuth().updateUser(uid, { password: newPassword });
+  invalidateAdminSnapshot();
   return { ok: true, uid };
 }
 
@@ -267,6 +310,7 @@ async function setUserDisabled(uid, disabled) {
   if (!hasFirebaseAdmin()) throw new Error("FIREBASE_SERVICE_ACCOUNT가 설정되지 않았습니다.");
   if (!uid) throw new Error("uid가 필요합니다.");
   await getAuth().updateUser(uid, { disabled });
+  invalidateAdminSnapshot();
   return { ok: true, uid, disabled };
 }
 
@@ -274,6 +318,7 @@ async function deleteUser(uid) {
   if (!hasFirebaseAdmin()) throw new Error("FIREBASE_SERVICE_ACCOUNT가 설정되지 않았습니다.");
   if (!uid) throw new Error("uid가 필요합니다.");
   await getAuth().deleteUser(uid);
+  invalidateAdminSnapshot();
   return { ok: true, uid };
 }
 
@@ -296,6 +341,8 @@ module.exports = {
   changeAdminCredentials,
   getAdminStats,
   getAdminUsers,
+  getAdminOverview,
+  invalidateAdminSnapshot,
   resetUserPassword,
   setUserDisabled,
   deleteUser,
