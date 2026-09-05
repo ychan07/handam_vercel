@@ -68,7 +68,6 @@ const state = {
   fortuneBirthday: null,
   fortune: null,
   selectedPrompt: "",
-  adminUsers: [],
   settings: null,
   recordsSource: "none",
 };
@@ -315,13 +314,6 @@ function getDisplayName() {
 }
 function getAppPublicUrl() {
   return window.location.origin.replace(/\/$/, "");
-}
-function adminHeaders() {
-  return state.admin?.token ? { "Content-Type": "application/json", "X-Admin-Token": state.admin.token } : { "Content-Type": "application/json" };
-}
-async function adminApi(path, payload) {
-  const data = await apiPost(path, { adminToken: state.admin?.token, ...(payload || {}) });
-  return data;
 }
 async function sendPresenceHeartbeat() {
   if (!state.auth?.uid || state.auth.isLocalAdmin || state.auth.isAdmin) return;
@@ -889,6 +881,22 @@ function replayRevealAnimations(pageEl) {
 }
 
 function go(id) {
+  if (id === "admin") {
+    if (!state.admin?.token) return go("login");
+    const options = {
+      getSession: () => state.admin,
+      onSessionChange: (session) => {
+        state.admin = session;
+        sessionStorage.setItem("handam-admin", JSON.stringify(session));
+      },
+      onLogout: adminLogout,
+    };
+    if (window.handamAdmin) window.handamAdmin.mount(options);
+    else window.handamAdminPending = options;
+    return;
+  }
+  window.handamAdminPending = undefined;
+  window.handamAdmin?.unmount();
   const target = document.getElementById("page-" + id);
   if (!target) return;
   document.querySelectorAll(".page").forEach((p) => p.classList.toggle("active", p === target));
@@ -911,7 +919,7 @@ function go(id) {
     renderFortuneUI();
   }
   if (id === "backup") updateBackupStats();
-  if (id === "admin") loadAdminDashboard();
+
 }
 function applyTheme(t, { save = true } = {}) {
   const theme = t === "dark" ? "dark" : "light";
@@ -1269,7 +1277,7 @@ async function loginAsAdmin(username, password) {
 }
 async function login() {
   const email = document.getElementById("login-email").value.trim();
-  const password = document.getElementById("login-password").value.trim();
+  const password = document.getElementById("login-password").value;
   if (!email || !password) return showToast("이메일과 비밀번호를 입력해주세요.");
 
   // 관리자 아이디는 이메일 형식이 아닌 경우가 많음 → 관리자 API로 먼저 시도
@@ -1372,7 +1380,6 @@ async function logout() {
   state.auth = null;
   state.profile = null;
   state.admin = null;
-  state.adminUsers = [];
   state.settings = normalizeUserSettings();
   state.records = [];
   state.recordsSource = "none";
@@ -1386,221 +1393,22 @@ async function logout() {
   showToast("로그아웃했어요.");
   go("login");
 }
-function adminLogout() {
+function adminLogout(message) {
+  window.handamAdminPending = undefined;
+  window.handamAdmin?.unmount();
   state.admin = null;
   state.auth = null;
+  state.profile = null;
   state.settings = normalizeUserSettings();
   state.records = [];
   state.recordsSource = "none";
   cloudLoadUid = null;
   cloudLoadPromise = null;
+  stopPresenceHeartbeat();
   sessionStorage.removeItem("handam-admin");
-  showToast("관리자 로그아웃했어요.");
+  void signOut(auth).catch(() => {});
   go("login");
-}
-function formatAdminDate(iso) {
-  if (!iso) return "-";
-  const d = new Date(iso);
-  return `${d.getMonth() + 1}/${d.getDate()} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
-}
-function getFilteredAdminUsers() {
-  const q = (document.getElementById("admin-search")?.value || "").trim().toLowerCase();
-  const filter = document.getElementById("admin-filter")?.value || "all";
-  return state.adminUsers.filter((user) => {
-    if (filter === "active" && !user.active) return false;
-    if (filter === "disabled" && !user.disabled) return false;
-    if (filter === "online" && !user.active) return false;
-    if (!q) return true;
-    const hay = `${user.displayName || ""} ${user.email || ""} ${user.uid}`.toLowerCase();
-    return hay.includes(q);
-  });
-}
-function exportAdminUsersCsv() {
-  const users = getFilteredAdminUsers();
-  const header = ["uid", "displayName", "email", "disabled", "active", "createdAt", "lastSignIn", "providers"];
-  const lines = [header.join(",")];
-  users.forEach((u) => {
-    lines.push(
-      [
-        u.uid,
-        `"${(u.displayName || "").replace(/"/g, '""')}"`,
-        u.email || "",
-        u.disabled,
-        u.active,
-        u.createdAt || "",
-        u.lastSignIn || "",
-        `"${(u.providers || []).join("|")}"`,
-      ].join(",")
-    );
-  });
-  const blob = new Blob(["\uFEFF" + lines.join("\n")], { type: "text/csv;charset=utf-8" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = `handam-users-${Date.now()}.csv`;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  URL.revokeObjectURL(url);
-  showToast("유저 목록 CSV를 저장했어요.");
-}
-async function loadAdminDashboard() {
-  if (!state.admin?.token) return go("login");
-  const adminName = document.getElementById("admin-username-label");
-  if (adminName) adminName.textContent = state.admin.username || "admin";
-  try {
-    const stats = await adminApi("/api/admin/stats");
-    const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = String(v ?? 0); };
-    set("admin-total-users", stats.totalUsers);
-    set("admin-active-users", stats.activeUsers);
-    set("admin-disabled-users", stats.disabledUsers);
-    set("admin-email-users", stats.emailUsers);
-    set("admin-active-window", stats.activeWindowMinutes ?? 15);
-    const hint = document.getElementById("admin-firebase-hint");
-    if (hint) {
-      if (!stats.firebaseConfigured) {
-        hint.textContent = "FIREBASE_SERVICE_ACCOUNT 환경 변수를 설정하면 유저 관리 기능이 활성화됩니다.";
-        hint.className = "admin-hint warn";
-        hint.style.display = "block";
-      } else if (stats.firestoreEnabled === false) {
-        hint.textContent = "Firestore 미연동 · 활동 중 유저는 최근 로그인 기준으로 표시됩니다.";
-        hint.className = "admin-hint info";
-        hint.style.display = "block";
-      } else {
-        hint.style.display = "none";
-      }
-    }
-    await renderAdminUsers();
-  } catch (error) {
-    showToast(error.message || "관리자 데이터를 불러오지 못했어요.");
-  }
-}
-async function renderAdminUsers() {
-  const box = document.getElementById("admin-user-list");
-  const countEl = document.getElementById("admin-list-count");
-  if (!box) return;
-  box.innerHTML = '<div class="admin-empty">불러오는 중…</div>';
-  try {
-    const data = await adminApi("/api/admin/users");
-    state.adminUsers = data.users || [];
-    paintAdminUserList();
-    if (countEl) countEl.textContent = `${getFilteredAdminUsers().length}명 표시`;
-  } catch (error) {
-    box.innerHTML = `<div class="admin-empty">${error.message || "목록 로드 실패"}</div>`;
-  }
-}
-function paintAdminUserList() {
-  const box = document.getElementById("admin-user-list");
-  const countEl = document.getElementById("admin-list-count");
-  if (!box) return;
-  const users = getFilteredAdminUsers();
-  if (countEl) countEl.textContent = `${users.length}명 표시`;
-  if (!users.length) {
-    box.innerHTML = '<div class="admin-empty">조건에 맞는 사용자가 없습니다.</div>';
-    return;
-  }
-  box.innerHTML = "";
-  users.forEach((user) => {
-    const label = user.displayName || user.email?.split("@")[0] || "유저";
-    const initial = label.slice(0, 1);
-    const row = document.createElement("article");
-    row.className = "admin-user-card";
-    row.innerHTML = `
-      <div class="admin-user-head">
-        <div class="admin-user-avatar">${initial}</div>
-        <div class="admin-user-meta">
-          <div class="admin-user-name">${label}</div>
-          <div class="admin-user-email">${user.email || "이메일 없음"}</div>
-          <div class="admin-user-tags">
-            <span class="chip ${user.active ? "emo-calm" : ""}">${user.active ? "활동 중" : "오프라인"}</span>
-            ${user.disabled ? '<span class="chip emo-excited">정지됨</span>' : ""}
-            <span class="chip">${(user.providers || []).map((p) => p.replace(".com", "")).join(" · ") || "—"}</span>
-          </div>
-          <div class="admin-user-dates">
-            가입 ${formatAdminDate(user.createdAt)} · 최근 ${formatAdminDate(user.lastSignIn)}
-          </div>
-        </div>
-      </div>
-      <div class="admin-user-tools">
-        ${
-          user.email
-            ? `<input class="input admin-reset-input" type="password" placeholder="새 비밀번호 (6자+)" data-uid="${user.uid}">
-        <button type="button" class="admin-tool-btn" data-action="reset-pw" data-uid="${user.uid}"><i class="fa-solid fa-key"></i> 비번 초기화</button>
-        <button type="button" class="admin-tool-btn" data-action="reset-link" data-email="${user.email}"><i class="fa-solid fa-link"></i> 재설정 링크</button>`
-            : ""
-        }
-        <button type="button" class="admin-tool-btn" data-action="toggle" data-uid="${user.uid}" data-disabled="${user.disabled}">
-          <i class="fa-solid fa-${user.disabled ? "check" : "ban"}"></i> ${user.disabled ? "정지 해제" : "계정 정지"}
-        </button>
-        <button type="button" class="admin-tool-btn danger" data-action="delete" data-uid="${user.uid}" data-label="${label}">
-          <i class="fa-solid fa-trash"></i> 삭제
-        </button>
-      </div>`;
-    box.appendChild(row);
-  });
-  box.querySelectorAll("[data-action]").forEach((btn) => {
-    btn.addEventListener("click", () => handleAdminUserAction(btn));
-  });
-}
-async function handleAdminUserAction(btn) {
-  const action = btn.dataset.action;
-  const uid = btn.dataset.uid;
-  try {
-    if (action === "reset-pw") {
-      const input = document.querySelector(`.admin-reset-input[data-uid="${uid}"]`);
-      const newPassword = input?.value?.trim();
-      if (!newPassword || newPassword.length < 6) return showToast("6자 이상 비밀번호를 입력해주세요.");
-      await adminApi("/api/admin/reset-password", { uid, newPassword });
-      if (input) input.value = "";
-      showToast("비밀번호를 초기화했어요.");
-    } else if (action === "reset-link") {
-      const data = await adminApi("/api/admin/reset-link", { email: btn.dataset.email });
-      try {
-        await navigator.clipboard.writeText(data.link);
-        showToast("재설정 링크를 복사했어요. 카톡/메일로 전달하세요.");
-      } catch (_e) {
-        window.prompt("재설정 링크 (복사해서 전달하세요):", data.link);
-      }
-    } else if (action === "toggle") {
-      const disabled = btn.dataset.disabled === "true";
-      await adminApi("/api/admin/toggle-user", { uid, disabled: !disabled });
-      showToast(disabled ? "계정 정지를 해제했어요." : "계정을 정지했어요.");
-      await renderAdminUsers();
-    } else if (action === "delete") {
-      if (!confirm(`"${btn.dataset.label}" 계정을 삭제할까요? 되돌릴 수 없습니다.`)) return;
-      await adminApi("/api/admin/delete-user", { uid });
-      showToast("계정을 삭제했어요.");
-      await loadAdminDashboard();
-    }
-  } catch (error) {
-    showToast(error.message || "작업에 실패했어요.");
-  }
-}
-function bindAdminControls() {
-  document.getElementById("admin-search")?.addEventListener("input", paintAdminUserList);
-  document.getElementById("admin-filter")?.addEventListener("change", paintAdminUserList);
-}
-async function saveAdminCredentials() {
-  if (!state.admin?.token) return showToast("관리자 로그인이 필요해요.");
-  const currentPassword = document.getElementById("admin-current-password").value;
-  const newUsername = document.getElementById("admin-new-username").value.trim();
-  const newPassword = document.getElementById("admin-new-password").value;
-  if (!currentPassword) return showToast("현재 관리자 비밀번호를 입력해주세요.");
-  try {
-    const data = await apiPost("/api/admin/credentials", {
-      adminToken: state.admin.token,
-      currentPassword,
-      newUsername: newUsername || undefined,
-      newPassword: newPassword || undefined,
-    });
-    state.admin = { token: data.token, username: data.username };
-    sessionStorage.setItem("handam-admin", JSON.stringify(state.admin));
-    document.getElementById("admin-current-password").value = "";
-    document.getElementById("admin-new-password").value = "";
-    showToast("관리자 계정을 변경했어요. 다음부터는 새 아이디·비밀번호로 로그인하세요.");
-  } catch (error) {
-    showToast(error.message || "관리자 정보 변경에 실패했어요.");
-  }
+  showToast(typeof message === "string" ? message : "관리자 로그아웃했어요.");
 }
 async function changePassword() {
   const currentPassword = document.getElementById("password-current").value.trim();
@@ -1982,10 +1790,6 @@ window.registerFromSignup = registerFromSignup;
 window.sendPasswordReset = sendPasswordReset;
 window.showFindHint = showFindHint;
 window.adminLogout = adminLogout;
-window.saveAdminCredentials = saveAdminCredentials;
-window.renderAdminUsers = renderAdminUsers;
-window.loadAdminDashboard = loadAdminDashboard;
-window.exportAdminUsersCsv = exportAdminUsersCsv;
 window.changePassword = changePassword; window.exportDiaries = exportDiaries; window.showToast = showToast; window.openSheet = openSheet; window.closeSheet = closeSheet;
 
 function bindFindAccountTabs() {
@@ -1999,22 +1803,13 @@ function bindFindAccountTabs() {
   });
 }
 
-(function preventPinchZoom() {
-  document.addEventListener("gesturestart", (e) => e.preventDefault(), { passive: false });
-  let lastTouchEnd = 0;
-  document.addEventListener("touchend", (e) => {
-    const now = Date.now();
-    if (now - lastTouchEnd <= 300) e.preventDefault();
-    lastTouchEnd = now;
-  }, { passive: false });
-})();
 
 (async function bootstrap() {
   state.settings = loadCachedSettings("guest");
   state.settings.theme = localStorage.getItem("handam-theme") || state.settings.theme;
   applyUserSettings(state.settings, { applyFortune: false });
   await loadAppData();
-  bindSegmentButtons(); bindFindAccountTabs(); bindAdminControls();
+  bindSegmentButtons(); bindFindAccountTabs();
   bindHomeWeekStrip();
   initFortune();
   fillBirthdaySelects();

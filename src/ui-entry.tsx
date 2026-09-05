@@ -1,3 +1,4 @@
+import { initAdminBridge } from "./admin/bridge";
 import { createRoot } from "react-dom/client";
 import "./index.css";
 import "./ui/splash.css";
@@ -34,4 +35,5 @@ async function bootSplash() {
   }
 }
 
+initAdminBridge();
 bootSplash();

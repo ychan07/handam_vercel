@@ -53,6 +53,8 @@ const FORTUNE_DEFAULTS: Required<
     | "exitFadeDurationS"
     | "symbolDurationS"
     | "symbolPulseDurationS"
+    | "constellationLineDrawS"
+    | "constellationStarStaggerMs"
     | "blurTextDelayMs"
     | "blurTextStepDurationS"
     | "progressBarDurationS"
@@ -134,7 +136,7 @@ export default function FortuneLoadingScreen({
 
   return (
     <AnimatePresence>
-      {phase !== "gone" && (
+      {(
         <motion.div
           className="fortune-loading-screen"
           initial={{ opacity: 1 }}

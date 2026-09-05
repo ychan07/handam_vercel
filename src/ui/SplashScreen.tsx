@@ -114,7 +114,7 @@ export default function SplashScreen({ onDone, splashConfig }: SplashScreenProps
 
   return (
     <AnimatePresence>
-      {phase !== "gone" && (
+      {(
         <motion.div
           className="splash-screen"
           initial={{ opacity: 1 }}

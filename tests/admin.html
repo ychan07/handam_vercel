@@ -1,0 +1,11 @@
+<!doctype html><html lang="ko" data-theme="light"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><link rel="stylesheet" href="/styles.css"><link rel="stylesheet" href="/ui-dist/ui.css"><title>한담 관리자 UI 검증</title></head><body>
+<div class="device"><div id="test-login">로그인 화면</div></div>
+<div id="admin-root" class="handam-admin" hidden><div id="admin-app"></div><div id="admin-portals"></div></div>
+<script>
+  window.testSession = {token:'mock-token', username:'한담지기'};
+  window.handamAdminPending = {
+    getSession: () => window.testSession,
+    onSessionChange: session => { window.testSession = session; sessionStorage.setItem('handam-admin', JSON.stringify(session)); },
+    onLogout: message => { window.testSession = null; sessionStorage.removeItem('handam-admin'); document.getElementById('test-login').textContent = message || '로그인 화면'; }
+  };
+</script><script type="module" src="/ui-dist/ui.bundle.js"></script></body></html>

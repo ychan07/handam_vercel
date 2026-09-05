@@ -2,7 +2,7 @@
 <html lang="ko" data-theme="light">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <meta name="theme-color" content="#F4F1EA">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
@@ -20,6 +20,7 @@
 <body>
 <div id="splash-root"></div>
 <div id="fortune-loading-root"></div>
+<div id="admin-root" class="handam-admin" hidden><div id="admin-app"></div><div id="admin-portals"></div></div>
 <div class="device app-shell--loading">
 
   <!-- ============ HOME ============ -->
@@ -580,69 +581,6 @@
       </div>
       <div class="auth-links reveal" style="--d:.16s">
         <button type="button" class="text-link" onclick="go('login')">로그인으로 돌아가기</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- ============ ADMIN ============ -->
-  <div id="page-admin" class="page admin-page">
-    <div class="pad auth-pad">
-      <div class="admin-hero reveal" style="--d:.02s">
-        <button class="iconbtn" onclick="adminLogout()"><i class="fa-solid fa-arrow-left"></i></button>
-        <div style="flex:1">
-          <span class="eyebrow"><i class="fa-solid fa-shield-halved"></i> ADMIN</span>
-          <h1 class="h-page" style="margin-top:4px">관리자 대시보드</h1>
-          <p class="muted" style="font-size:12px;font-weight:600;margin-top:4px">로그인: <b id="admin-username-label">admin</b></p>
-        </div>
-      </div>
-      <p id="admin-firebase-hint" class="admin-hint warn" style="display:none"></p>
-      <div class="admin-stat-grid reveal" style="--d:.06s">
-        <div class="admin-stat-card">
-          <i class="fa-solid fa-users"></i>
-          <div class="admin-stat-num" id="admin-total-users">0</div>
-          <div class="admin-stat-label">전체 유저</div>
-        </div>
-        <div class="admin-stat-card accent">
-          <i class="fa-solid fa-signal"></i>
-          <div class="admin-stat-num" id="admin-active-users">0</div>
-          <div class="admin-stat-label">활동 중 (<span id="admin-active-window">15</span>분)</div>
-        </div>
-        <div class="admin-stat-card">
-          <i class="fa-solid fa-envelope"></i>
-          <div class="admin-stat-num" id="admin-email-users">0</div>
-          <div class="admin-stat-label">이메일 가입</div>
-        </div>
-        <div class="admin-stat-card warn">
-          <i class="fa-solid fa-user-slash"></i>
-          <div class="admin-stat-num" id="admin-disabled-users">0</div>
-          <div class="admin-stat-label">정지 계정</div>
-        </div>
-      </div>
-      <div class="admin-toolbar reveal" style="--d:.1s">
-        <input class="input admin-search" id="admin-search" type="search" placeholder="이름·이메일 검색">
-        <select class="field admin-filter" id="admin-filter">
-          <option value="all">전체</option>
-          <option value="active">활동 중</option>
-          <option value="disabled">정지됨</option>
-        </select>
-      </div>
-      <div class="admin-toolbar reveal" style="--d:.12s">
-        <button type="button" class="btn btn-line admin-mini-btn" onclick="renderAdminUsers()"><i class="fa-solid fa-rotate"></i> 새로고침</button>
-        <button type="button" class="btn btn-line admin-mini-btn" onclick="exportAdminUsersCsv()"><i class="fa-solid fa-file-csv"></i> CSV</button>
-        <span class="muted" style="font-size:12px;font-weight:700;margin-left:auto" id="admin-list-count">0명</span>
-      </div>
-      <div class="admin-user-list reveal" style="--d:.14s" id="admin-user-list"></div>
-      <div class="reveal" style="--d:.18s;margin:22px 4px 10px"><span class="h-sec">관리자 계정</span></div>
-      <div class="card reveal" style="--d:.2s">
-        <label class="field-label">현재 비밀번호</label>
-        <input class="input" id="admin-current-password" type="password" placeholder="현재 관리자 비밀번호">
-        <label class="field-label" style="margin-top:14px">새 아이디</label>
-        <input class="input" id="admin-new-username" type="text" placeholder="변경 시에만">
-        <label class="field-label" style="margin-top:14px">새 비밀번호</label>
-        <input class="input" id="admin-new-password" type="password" placeholder="변경 시에만">
-        <button class="btn btn-primary" style="margin-top:16px" onclick="saveAdminCredentials()">
-          <i class="fa-solid fa-shield-halved"></i> 저장
-        </button>
       </div>
     </div>
   </div>
