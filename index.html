@@ -53,6 +53,8 @@
     <symbol id="i-download" viewBox="0 0 24 24"><path d="M12 3v12M7 10l5 5 5-5"/><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/></symbol>
     <symbol id="i-logout" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/></symbol>
     <symbol id="i-rotate" viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-3-6.7L21 8"/><path d="M21 3v5h-5"/></symbol>
+    <symbol id="i-bell" viewBox="0 0 24 24"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.9 1.9 0 0 0 3.4 0"/></symbol>
+    <symbol id="i-lock" viewBox="0 0 24 24"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></symbol>
     <symbol id="i-back" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></symbol>
     <symbol id="i-cake" viewBox="0 0 24 24"><path d="M20 21v-8a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8M4 16s.5-1 2-1 2.5 2 4 2 2.5-2 4-2 2.5 2 4 2 2-1 2-1M2 21h20M7 8v3M12 8v3M17 8v3M7 4h.01M12 4h.01M17 4h.01"/></symbol>
     <symbol id="i-quote" viewBox="0 0 24 24"><path d="M3 21c3 0 7-1 7-8V5c0-1.2-.8-2-2-2H4c-1.2 0-2 .8-2 2v6c0 1.2.8 2 2 2h3c0 3-2 5-4 5zM14 21c3 0 7-1 7-8V5c0-1.2-.8-2-2-2h-4c-1.2 0-2 .8-2 2v6c0 1.2.8 2 2 2h3c0 3-2 5-4 5z"/></symbol>
@@ -253,7 +255,7 @@
       </div>
 
       <section class="diary-editor" id="diary-editor" hidden aria-label="새 기록 작성">
-        <div class="card upload-card">
+        <div class="card upload-card" id="upload-card">
           <div class="step-title">
             <span>01</span>
             <div><h3>손글씨 기록 불러오기</h3><p>다이어리 사진을 올리면 AI가 글자를 읽어 드려요.</p></div>
@@ -291,7 +293,7 @@
         <form class="card writing-card" id="writing-form" novalidate>
           <div class="step-title">
             <span>02</span>
-            <div><h3>기록 다듬기</h3><p>변환된 내용을 자유롭게 수정할 수 있어요.</p></div>
+            <div><h3 id="writer-step2-title">기록 다듬기</h3><p>변환된 내용을 자유롭게 수정할 수 있어요.</p></div>
           </div>
           <div class="two-fields">
             <label>날짜<input type="date" id="manual-date"></label>
@@ -299,9 +301,19 @@
           </div>
           <label>제목<input id="manual-title" type="text" placeholder="오늘의 기록에 제목을 붙여 주세요" autocomplete="off" maxlength="200"></label>
           <label>기록<textarea id="manual-body" placeholder="오늘 마음에 머문 이야기를 적어 보세요. 사진을 올리면 인식한 글이 여기에 채워져요." autocomplete="off"></textarea></label>
+          <label>태그<input id="manual-tags" type="text" placeholder="#산책 #봄 처럼 띄어 써 주세요 (최대 10개)" autocomplete="off" maxlength="220"></label>
+          <button type="button" class="btn btn-secondary btn-block" id="manual-ai-btn">
+            <svg class="icon" aria-hidden="true"><use href="#i-sparkles"/></svg><span data-button-label>AI로 미리 정리해 보기</span>
+          </button>
+          <div class="ai-result" id="manual-ai-result" hidden aria-live="polite">
+            <div><svg class="icon" aria-hidden="true"><use href="#i-sparkles"/></svg>AI 요약 미리보기</div>
+            <p id="manual-ai-summary"></p>
+            <small id="manual-ai-note"></small>
+          </div>
           <button type="submit" class="btn btn-primary btn-block" id="manual-save-btn">
             <svg class="icon" aria-hidden="true"><use href="#i-check"/></svg><span data-button-label>오늘의 기록 저장하기</span>
           </button>
+          <button type="button" class="text-link cancel-edit" id="manual-cancel-edit" hidden>수정 취소</button>
         </form>
       </section>
 
@@ -352,12 +364,16 @@
         </div>
         <h2 id="record-title">한강에서의 산책</h2>
         <p id="record-body">친구와 함께 한강을 걸으며 바람을 느꼈다.</p>
+        <div id="record-tags"></div>
       </article>
       <div class="ai-result reveal" style="--d:.12s">
         <div><svg class="icon" aria-hidden="true"><use href="#i-sparkles"/></svg>AI 요약</div>
         <p id="record-summary">“기분 좋은 산책과 대화가 마음을 가볍게 만든 하루.”</p>
       </div>
-      <button type="button" class="btn btn-danger btn-block reveal" style="--d:.17s" id="record-delete-btn">
+      <button type="button" class="btn btn-secondary btn-block reveal" style="--d:.15s" id="record-edit-btn">
+        <svg class="icon" aria-hidden="true"><use href="#i-pen"/></svg>이 기록 수정하기
+      </button>
+      <button type="button" class="btn btn-danger btn-block reveal" style="--d:.17s;margin-top:10px" id="record-delete-btn">
         <svg class="icon" aria-hidden="true"><use href="#i-trash"/></svg>이 기록 삭제하기
       </button>
     </div>
@@ -433,7 +449,13 @@
         <div class="word-cloud" id="analysis-keywords"></div>
       </section>
 
-      <div class="card gentle-note reveal" style="--d:.24s">
+      <section class="card reveal" style="--d:.23s" aria-labelledby="topics-title">
+        <div class="section-title"><div><p>반복되는 이야기</p><h3 id="topics-title">나의 주요 주제</h3></div></div>
+        <div class="theme-list" id="analysis-topics"></div>
+        <p class="caption" id="analysis-topics-caption">태그와 자주 쓴 단어를 바탕으로 묶었어요.</p>
+      </section>
+
+      <div class="card gentle-note reveal" style="--d:.26s">
         <svg class="icon" aria-hidden="true"><use href="#i-leaf"/></svg>
         <div>
           <b>기억해 주세요</b>
@@ -516,6 +538,8 @@
         <p id="prompt-meta">최근 일기 <b>0편</b>을 분석해<br>오늘의 마음에 어울리는 글감을 골랐어요.</p>
       </div>
 
+      <div class="categories reveal" style="--d:.05s" id="prompt-categories" role="tablist" aria-label="글감 카테고리"></div>
+
       <section class="card question-card reveal" style="--d:.07s" aria-labelledby="question-title">
         <div class="question-head">
           <div><span>오늘의 질문</span><h3 id="question-title">마음에 닿는 질문을 골라 보세요</h3></div>
@@ -567,8 +591,13 @@
       </div>
 
       <section class="settings-group settings-preferences reveal" style="--d:.1s" aria-labelledby="settings-screen-label">
-        <p id="settings-screen-label">화면</p>
+        <p id="settings-screen-label">기록 · 화면</p>
         <div class="list">
+          <button type="button" class="list-item setting-row settings-action" id="reminder-switch" role="switch" aria-checked="true" aria-label="기록 알림" aria-describedby="reminder-help" data-settings-action="reminder">
+            <i aria-hidden="true"><svg class="icon"><use href="#i-bell"/></svg></i>
+            <span class="lead" aria-hidden="true"><b>기록 알림</b><small id="reminder-help">앱을 연 저녁 9시 이후, 오늘 기록이 없으면 알려 드려요</small></span>
+            <span class="switch" aria-hidden="true"><u></u></span>
+          </button>
           <button type="button" class="list-item setting-row settings-action" id="dark-switch" role="switch" aria-checked="false" aria-label="다크 모드" data-settings-action="theme">
             <i aria-hidden="true"><svg class="icon"><use href="#i-moon"/></svg></i>
             <span class="lead" aria-hidden="true"><b>다크 모드</b><small>밤에도 눈이 편안한 화면</small></span>
@@ -616,7 +645,22 @@
           </button>
         </div>
       </section>
-      <p class="app-version settings-footer reveal" style="--d:.22s">
+      <section class="settings-group reveal" style="--d:.2s" aria-labelledby="settings-guide-label">
+        <p id="settings-guide-label">한담 안내</p>
+        <div class="list">
+          <button type="button" class="list-item setting-row settings-action" data-settings-action="ai-guide" aria-label="한담 AI 안내">
+            <i aria-hidden="true"><svg class="icon"><use href="#i-sparkles"/></svg></i>
+            <span class="lead" aria-hidden="true"><b>한담 AI 안내</b><small>AI가 기록을 다루는 방식을 알아보세요</small></span>
+            <svg class="icon chevron" aria-hidden="true"><use href="#i-chevron"/></svg>
+          </button>
+          <button type="button" class="list-item setting-row settings-action" data-settings-action="privacy" aria-label="개인정보와 보안">
+            <i aria-hidden="true"><svg class="icon"><use href="#i-lock"/></svg></i>
+            <span class="lead" aria-hidden="true"><b>개인정보와 보안</b><small>나의 기록이 보관되는 방식을 확인해요</small></span>
+            <svg class="icon chevron" aria-hidden="true"><use href="#i-chevron"/></svg>
+          </button>
+        </div>
+      </section>
+      <p class="app-version settings-footer reveal" style="--d:.24s">
         HANDAM · 오늘의 마음을 위한 조용한 공간<br>버전 1.0.0 · 변경 사항은 자동으로 동기화돼요.
       </p>
     </div>
@@ -663,6 +707,60 @@
       <button type="button" class="btn btn-primary btn-block reveal" style="--d:.12s" id="backup-export-btn">
         <svg class="icon" aria-hidden="true"><use href="#i-download"/></svg>일기 내보내기
       </button>
+    </div>
+  </div>
+
+  <!-- ============ AI GUIDE ============ -->
+  <div id="page-ai-guide" class="page">
+    <div class="page-body info-page">
+      <div class="backbar reveal" style="--d:.02s">
+        <button type="button" class="iconbtn" data-go="settings" aria-label="마이페이지로 돌아가기"><svg class="icon" aria-hidden="true"><use href="#i-back"/></svg></button>
+        <span>마이페이지</span>
+      </div>
+      <div class="title-row compact reveal" style="--d:.04s"><div><p class="eyebrow">한담 안내</p><h2>한담 AI 안내</h2><p>AI는 기록을 돕는 도구일 뿐, 마음을 평가하거나 진단하지 않아요.</p></div></div>
+      <section class="card info-card reveal" style="--d:.07s">
+        <h3><svg class="icon" aria-hidden="true"><use href="#i-camera"/></svg>손글씨 읽기</h3>
+        <p>다이어리 사진을 올리고 ‘AI로 손글씨 읽기’를 누르면, 사진이 한담 서버를 거쳐 네이버 Clova OCR로 전송되고 인식한 글자만 돌려받아요. 사진은 한담에 저장되지 않아요.</p>
+      </section>
+      <section class="card info-card reveal" style="--d:.1s">
+        <h3><svg class="icon" aria-hidden="true"><use href="#i-sparkles"/></svg>기록 요약</h3>
+        <p>기록을 저장하거나 ‘AI로 미리 정리해 보기’를 누르면 본문이 Google Gemini로 전송되어 한 줄 요약을 만들어요. 요약 방식(간결·균형·섬세)과 AI 페르소나는 마이페이지에서 바꿀 수 있어요. AI 연결이 안 될 때는 본문이 그대로 저장돼요.</p>
+      </section>
+      <section class="card info-card reveal" style="--d:.13s">
+        <h3><svg class="icon" aria-hidden="true"><use href="#i-chart"/></svg>감정 분석 · 회고</h3>
+        <p>분석과 회고 화면은 AI가 아니라 내 기기에서 기록의 감정·날짜·태그·자주 쓴 단어를 계산해 보여 줘요. 이 과정에서 기록이 외부로 전송되지 않아요.</p>
+      </section>
+      <section class="card info-card reveal" style="--d:.16s">
+        <h3><svg class="icon" aria-hidden="true"><use href="#i-sun"/></svg>오늘의 운세 · 글감</h3>
+        <p>운세는 입력한 생년월일과 날짜로 계산한 가벼운 콘텐츠예요. 글감은 최근 기록의 감정 비율과 단어를 바탕으로 준비된 질문 중에서 골라 드려요.</p>
+      </section>
+    </div>
+  </div>
+
+  <!-- ============ PRIVACY ============ -->
+  <div id="page-privacy" class="page">
+    <div class="page-body info-page">
+      <div class="backbar reveal" style="--d:.02s">
+        <button type="button" class="iconbtn" data-go="settings" aria-label="마이페이지로 돌아가기"><svg class="icon" aria-hidden="true"><use href="#i-back"/></svg></button>
+        <span>마이페이지</span>
+      </div>
+      <div class="title-row compact reveal" style="--d:.04s"><div><p class="eyebrow">한담 안내</p><h2>개인정보와 보안</h2><p>나의 기록이 어디에, 어떻게 보관되는지 알려 드려요.</p></div></div>
+      <section class="card info-card reveal" style="--d:.07s">
+        <h3><svg class="icon" aria-hidden="true"><use href="#i-lock"/></svg>계정에 보관되는 기록</h3>
+        <p>로그인하면 기록은 Firebase(Google Cloud)의 내 계정 공간에 저장돼요. 보안 규칙상 로그인한 본인만 자신의 기록을 읽고, 쓰고, 지울 수 있어요.</p>
+      </section>
+      <section class="card info-card reveal" style="--d:.1s">
+        <h3><svg class="icon" aria-hidden="true"><use href="#i-notebook"/></svg>이 기기에 남는 정보</h3>
+        <p>연결이 잠시 끊겨도 볼 수 있도록 마지막으로 불러온 기록과 설정을 이 브라우저에 보관해요. 계정 찾기용으로는 이메일을 가린 형태(예: r***@example.com)만 따로 남겨요. 로그인 상태는 Firebase가 이 브라우저에 유지하며, 로그아웃하면 해제돼요.</p>
+      </section>
+      <section class="card info-card reveal" style="--d:.13s">
+        <h3><svg class="icon" aria-hidden="true"><use href="#i-user"/></svg>운영자가 볼 수 있는 정보</h3>
+        <p>운영자 화면에는 계정 정보(이름·이메일·가입일·최근 접속 여부)가 표시돼요. 기록 내용은 운영자 화면에 나타나지 않아요.</p>
+      </section>
+      <section class="card info-card reveal" style="--d:.16s">
+        <h3><svg class="icon" aria-hidden="true"><use href="#i-download"/></svg>내 기록 가져가기 · 지우기</h3>
+        <p>마이페이지 ‘일기 백업 · 내보내기’에서 모든 기록을 JSON 파일로 받을 수 있어요. 기록은 나의 기록 화면에서 하나씩 지울 수 있고, 지운 기록은 되돌릴 수 없어요.</p>
+      </section>
     </div>
   </div>
 

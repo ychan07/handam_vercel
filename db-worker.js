@@ -12,7 +12,7 @@ function exportedBinaryArray() {
 function listRows() {
   const rows = [];
   const result = db.exec(
-    "SELECT id, title, body, mood, summary, createdAt, entryDate FROM diaries ORDER BY createdAt DESC"
+    "SELECT id, title, body, mood, summary, createdAt, entryDate, tags FROM diaries ORDER BY createdAt DESC"
   );
   if (!result[0]) return rows;
   const columns = result[0].columns;
@@ -21,9 +21,23 @@ function listRows() {
     columns.forEach((col, idx) => {
       row[col] = values[idx];
     });
+    row.tags = parseTags(row.tags);
     rows.push(row);
   }
   return rows;
+}
+
+function parseTags(value) {
+  try {
+    const parsed = JSON.parse(value || "[]");
+    return Array.isArray(parsed) ? parsed.map(String) : [];
+  } catch (_e) {
+    return [];
+  }
+}
+
+function serializeTags(tags) {
+  return JSON.stringify(Array.isArray(tags) ? tags.map(String).slice(0, 10) : []);
 }
 
 async function setup() {
@@ -48,10 +62,12 @@ async function setup() {
       entryDate TEXT
     );
   `);
-  try {
-    db.run("ALTER TABLE diaries ADD COLUMN entryDate TEXT");
-  } catch (_e) {
-    /* column already exists */
+  for (const column of ["entryDate TEXT", "tags TEXT"]) {
+    try {
+      db.run(`ALTER TABLE diaries ADD COLUMN ${column}`);
+    } catch (_e) {
+      /* column already exists */
+    }
   }
 }
 
@@ -71,7 +87,7 @@ self.onmessage = async (event) => {
         payload.entryDate ||
         (typeof payload.createdAt === "string" ? payload.createdAt.slice(0, 10) : "");
       db.run(
-        "INSERT INTO diaries (title, body, mood, summary, createdAt, entryDate) VALUES (?, ?, ?, ?, ?, ?)",
+        "INSERT INTO diaries (title, body, mood, summary, createdAt, entryDate, tags) VALUES (?, ?, ?, ?, ?, ?, ?)",
         [
           payload.title,
           payload.body,
@@ -79,6 +95,24 @@ self.onmessage = async (event) => {
           payload.summary || "",
           payload.createdAt,
           entryDate,
+          serializeTags(payload.tags),
+        ]
+      );
+      self.postMessage({ id, data: { ok: true, serialized: exportedBinaryArray() } });
+      return;
+    }
+
+    if (type === "update") {
+      db.run(
+        "UPDATE diaries SET title = ?, body = ?, mood = ?, summary = ?, entryDate = ?, tags = ? WHERE id = ?",
+        [
+          payload.title,
+          payload.body,
+          payload.mood,
+          payload.summary || "",
+          payload.entryDate,
+          serializeTags(payload.tags),
+          payload.id,
         ]
       );
       self.postMessage({ id, data: { ok: true, serialized: exportedBinaryArray() } });

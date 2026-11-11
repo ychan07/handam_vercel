@@ -79,6 +79,9 @@ const state = {
   reportKey: "",
   ocrFile: null,
   fortuneOpened: false,
+  editingRecordId: null,
+  aiDraft: null,
+  promptCategory: "recommended",
 };
 const googleProvider = new GoogleAuthProvider();
 const AUTH_PAGES = new Set(["login", "signup", "find-account", "admin"]);
@@ -213,6 +216,7 @@ function recordFromFirestore(snapshot) {
     aiModel: String(data.aiModel || ""),
     summaryQuality: String(data.summaryQuality || ""),
     summaryGenerated: Boolean(data.summaryGenerated),
+    tags: Array.isArray(data.tags) ? data.tags.map(String).slice(0, 10) : [],
     createdAt: firestoreTimestampToIso(data.createdAt),
     entryDate: String(data.entryDate || ""),
   };
@@ -226,6 +230,7 @@ function applyUserSettings(settings, { applyFortune = true } = {}) {
   applyTheme(next.theme, { save: false });
   document.getElementById("fortune-lunar-switch")?.classList.toggle("on", next.lunarCalendar);
   document.getElementById("fortune-lunar-switch")?.setAttribute("aria-checked", String(next.lunarCalendar));
+  document.getElementById("reminder-switch")?.setAttribute("aria-checked", String(next.recordReminder));
   document.querySelectorAll("[data-setting-segment]").forEach((segment) => {
     const key = segment.dataset.settingSegment;
     segment.querySelectorAll("button").forEach((button) => {
@@ -679,7 +684,39 @@ function bindHomeWeekStrip() {
     openWeekStatsSheet(card);
   });
 }
+/* ---------- Record reminder (while the app is open) ---------- */
+const REMINDER_HOUR = 21;
+async function toggleRecordReminder() {
+  const next = !currentSettings().recordReminder;
+  if (next && "Notification" in window && Notification.permission === "default") {
+    try { await Notification.requestPermission(); } catch (_error) {}
+  }
+  await saveSettingsWithFeedback({ recordReminder: next });
+  checkRecordReminder();
+}
+function checkRecordReminder() {
+  if (!currentSettings().recordReminder || !state.auth?.uid || state.auth?.isAdmin) return;
+  if (state.recordsSource === "none") return;
+  if (new Date().getHours() < REMINDER_HOUR) return;
+  const todayKey = diaryEntryDate();
+  if (state.records.some((record) => recordDateKey(record) === todayKey)) return;
+  const shownKey = `handam-reminder-${state.auth.uid}`;
+  try {
+    if (localStorage.getItem(shownKey) === todayKey) return;
+    localStorage.setItem(shownKey, todayKey);
+  } catch (_error) {}
+  const message = "오늘의 마음을 아직 기록하지 않았어요. 한 줄만 남겨 볼까요?";
+  if (document.visibilityState === "hidden" && "Notification" in window && Notification.permission === "granted") {
+    try {
+      const notification = new Notification("한담", { body: message, icon: "./icons/handam-192.png", tag: "handam-reminder" });
+      notification.onclick = () => { window.focus(); go("diary"); };
+      return;
+    } catch (_error) {}
+  }
+  showToast(message);
+}
 function refreshHomeIfDateChanged() {
+  checkRecordReminder();
   const todayKey = diaryEntryDate();
   if (todayKey === lastHomeDiaryDateKey) return;
   lastHomeDiaryDateKey = todayKey;
@@ -939,7 +976,13 @@ function resetWriterForm() {
   if (body) body.value = "";
   if (date) date.value = diaryEntryDate();
   if (mood && mood.options.length) mood.selectedIndex = 0;
+  const tags = document.getElementById("manual-tags");
+  if (tags) tags.value = "";
   state.selectedPrompt = "";
+  state.editingRecordId = null;
+  state.aiDraft = null;
+  renderAiDraft();
+  updateWriterMode();
   clearOcrSelection();
 }
 function openWriter({ reset = false, focus = "title" } = {}) {
@@ -1152,6 +1195,8 @@ const PAGE_TITLES = Object.freeze({
   prompts: "오늘의 질문",
   password: "비밀번호 변경",
   backup: "백업 · 내보내기",
+  "ai-guide": "한담 AI 안내",
+  privacy: "개인정보와 보안",
 });
 const NAV_PARENT = Object.freeze({
   "record-detail": "records",
@@ -1159,6 +1204,8 @@ const NAV_PARENT = Object.freeze({
   prompts: "home",
   password: "settings",
   backup: "settings",
+  "ai-guide": "settings",
+  privacy: "settings",
 });
 function go(id) {
   if (id === "admin") {
@@ -1431,81 +1478,204 @@ async function saveManualDiary(event) {
   const pickedDate = String(document.getElementById("manual-date")?.value || "");
   const entryDate = /^\d{4}-\d{2}-\d{2}$/.test(pickedDate) && pickedDate <= diaryEntryDate() ? pickedDate : diaryEntryDate();
   const mood = formatMoodForSave(getSelectedMood("#manual-mood"));
+  const tags = parseTagInput(document.getElementById("manual-tags")?.value);
   setAuthButtonPending(saveButton, true, "AI가 기록을 정리하고 있어요…");
   try {
-    await persistDiary({ title, body, mood, entryDate });
+    await persistDiary({ title, body, mood, entryDate, tags });
   } finally {
     setAuthButtonPending(saveButton, false);
   }
 }
-async function persistDiary({ title, body, mood, entryDate }) {
-  let summary = body;
+
+/* ---------- Tags ---------- */
+function parseTagInput(value) {
+  const seen = new Set();
+  return String(value || "")
+    .split(/[\s,#]+/)
+    .map((tag) => tag.trim().slice(0, 20))
+    .filter((tag) => tag && !seen.has(tag) && seen.add(tag))
+    .slice(0, 10);
+}
+function formatTagInput(tags) {
+  return (tags || []).map((tag) => `#${tag}`).join(" ");
+}
+function tagsHtml(tags) {
+  if (!tags?.length) return "";
+  return `<div class="tags">${tags.map((tag) => `<span>#${escapeHtml(tag)}</span>`).join("")}</div>`;
+}
+
+/* ---------- AI preview before saving ---------- */
+async function requestSummary(body) {
   const settings = currentSettings();
+  const ai = await apiPost("/api/llm/summarize", {
+    text: body,
+    persona: settings.persona,
+    quality: settings.summaryQuality,
+  });
+  if (!ai?.summary) throw new Error("AI 요약 결과가 비어 있어요.");
+  return { text: body, summary: String(ai.summary), model: String(ai.model || "").slice(0, 100) };
+}
+function renderAiDraft() {
+  const box = document.getElementById("manual-ai-result");
+  if (!box) return;
+  const body = String(document.getElementById("manual-body")?.value || "").trim();
+  const draft = state.aiDraft;
+  const fresh = draft && draft.text === body;
+  box.hidden = !draft;
+  if (!draft) return;
+  document.getElementById("manual-ai-summary").textContent = draft.summary;
+  document.getElementById("manual-ai-note").textContent = fresh
+    ? "저장하면 이 요약이 함께 저장돼요."
+    : "본문이 바뀌었어요. 저장할 때 다시 정리해요.";
+}
+async function previewAiSummary() {
+  const button = document.getElementById("manual-ai-btn");
+  const body = String(document.getElementById("manual-body")?.value || "").trim();
+  if (!body) {
+    document.getElementById("manual-body")?.focus();
+    showToast("먼저 기록 내용을 적어 주세요.");
+    return;
+  }
+  if (button?.disabled) return;
+  setAuthButtonPending(button, true, "AI가 읽고 있어요…");
+  try {
+    state.aiDraft = await requestSummary(body);
+    renderAiDraft();
+  } catch (_error) {
+    showToast("AI 요약을 불러오지 못했어요. AI 연결 설정을 확인해 주세요.");
+  } finally {
+    setAuthButtonPending(button, false);
+  }
+}
+
+async function persistDiary({ title, body, mood, entryDate, tags = [] }) {
+  const settings = currentSettings();
+  const editing = state.editingRecordId
+    ? state.records.find((record) => String(record.id) === String(state.editingRecordId))
+    : null;
+  let summary = body;
   let aiModel = "";
   let summaryGenerated = false;
-  try {
-    const ai = await apiPost("/api/llm/summarize", {
-      text: body,
-      persona: settings.persona,
-      quality: settings.summaryQuality,
-    });
-    summary = ai.summary || summary;
-    aiModel = String(ai.model || "").slice(0, 100);
-    summaryGenerated = Boolean(ai.summary);
-  } catch (_error) {}
+  if (state.aiDraft?.text === body) {
+    ({ summary, model: aiModel } = state.aiDraft);
+    summaryGenerated = true;
+  } else if (editing && editing.body === body && editing.summary) {
+    summary = editing.summary;
+    aiModel = editing.aiModel || "";
+    summaryGenerated = Boolean(editing.summaryGenerated);
+  } else {
+    try {
+      ({ summary, model: aiModel } = await requestSummary(body));
+      summaryGenerated = true;
+    } catch (_error) {}
+  }
   const uid = state.auth?.uid;
+  const cloud = Boolean(uid && !state.auth?.isAdmin);
+  const fields = {
+    title: title.slice(0, 200),
+    body: body.slice(0, 200000),
+    mood: mood.slice(0, 50),
+    summary: String(summary).slice(0, 10000),
+    tags,
+    entryDate,
+  };
+  let tagsDropped = false;
   try {
-    if (uid && !state.auth?.isAdmin) {
-      const recordRef = doc(userDiariesRef(uid));
-      const now = new Date();
-      await setDoc(recordRef, {
+    if (cloud) {
+      const recordRef = editing ? doc(userDiariesRef(uid), String(editing.id)) : doc(userDiariesRef(uid));
+      const payload = {
         uid,
-        title: title.slice(0, 200),
-        body: body.slice(0, 200000),
-        mood: mood.slice(0, 50),
-        summary: String(summary).slice(0, 10000),
+        ...fields,
         aiPersona: settings.persona,
         aiModel,
         summaryQuality: settings.summaryQuality,
         summaryGenerated,
-        createdAt: Timestamp.fromDate(now),
-        entryDate,
         syncedAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
-      });
+      };
+      if (!tags.length && !editing?.tags?.length) delete payload.tags;
+      if (editing) {
+        await setDoc(recordRef, payload, { merge: true });
+      } else {
+        const createdAt = Timestamp.fromDate(new Date());
+        try {
+          await setDoc(recordRef, { ...payload, createdAt });
+        } catch (error) {
+          // Older deployed security rules reject the `tags` field: keep the diary, drop the tags.
+          if (error?.code !== "permission-denied" || !("tags" in payload)) throw error;
+          delete payload.tags;
+          await setDoc(recordRef, { ...payload, createdAt });
+          tagsDropped = true;
+        }
+      }
+    } else if (editing) {
+      persistSerialized(await callWorker("update", { id: editing.id, ...fields }));
     } else {
-      const result = await callWorker("insert", {
-        title,
-        body,
-        mood,
-        summary,
-        createdAt: new Date().toISOString(),
-        entryDate,
-      });
-      persistSerialized(result);
+      persistSerialized(await callWorker("insert", { ...fields, createdAt: new Date().toISOString() }));
     }
     await reloadRecords();
     resetWriterForm();
     setEditorOpen(false);
-    showToast(uid && !state.auth?.isAdmin ? "기록을 계정에 저장했어요." : "기록을 이 기기에 저장했어요.");
+    const where = cloud ? "계정에" : "이 기기에";
+    showToast(tagsDropped
+      ? "기록을 저장했어요. 태그는 서버 보안 규칙이 업데이트되면 저장할 수 있어요."
+      : editing ? `수정한 기록을 ${where} 저장했어요.` : `기록을 ${where} 저장했어요.`);
     go("records");
   } catch (error) {
     console.error("일기 저장 실패", error);
-    showToast("일기를 저장하지 못했어요. 연결을 확인해주세요.");
+    if (editing && error?.code === "permission-denied") {
+      showToast("서버 보안 규칙이 아직 기록 수정을 허용하지 않아요. firestore.rules 배포가 필요해요.");
+    } else {
+      showToast(editing ? "기록을 수정하지 못했어요. 연결을 확인해주세요." : "일기를 저장하지 못했어요. 연결을 확인해주세요.");
+    }
   }
+}
+function editRecord(record) {
+  if (!record) return;
+  resetWriterForm();
+  state.editingRecordId = record.id;
+  document.getElementById("manual-title").value = record.title === "제목 없는 기록" ? "" : record.title;
+  document.getElementById("manual-body").value = record.body;
+  document.getElementById("manual-date").value = recordDateKey(record) || diaryEntryDate();
+  document.getElementById("manual-tags").value = formatTagInput(record.tags);
+  const mood = document.getElementById("manual-mood");
+  const moodId = getEmotionById(record.mood)?.id;
+  if (mood && moodId) mood.value = moodId;
+  updateWriterMode();
+  openWriter({ focus: "body" });
+}
+function updateWriterMode() {
+  const editing = Boolean(state.editingRecordId);
+  const heading = document.getElementById("writer-step2-title");
+  const label = document.querySelector("#manual-save-btn [data-button-label]");
+  const cancel = document.getElementById("manual-cancel-edit");
+  if (heading) heading.textContent = editing ? "기록 수정하기" : "기록 다듬기";
+  if (label) label.textContent = editing ? "수정한 기록 저장하기" : "오늘의 기록 저장하기";
+  const saveButton = document.getElementById("manual-save-btn");
+  if (saveButton) delete saveButton.dataset.defaultLabel;
+  if (cancel) cancel.hidden = !editing;
+  document.getElementById("upload-card")?.toggleAttribute("hidden", editing);
 }
 
 function renderPromptRecommendations() {
   const analysis = analyzeEmotionsFromRecent(14);
-  const picks = pickPromptCards(analysis);
+  renderPromptCategories();
+  const category = state.promptCategory;
+  const categoryPool = category !== "recommended" ? promptByMood[category] : null;
+  const recommended = pickPromptCards(analysis);
+  const picks = categoryPool?.length
+    ? [0, 1, 2].map((i) => ({ prompt: categoryPool[((promptRotation[category] || 0) + i) % categoryPool.length], moodKey: category, fixed: true }))
+    : recommended;
   const cards = document.querySelectorAll(".prompt-slot");
   cards.forEach((card, index) => {
-    const { prompt, moodKey } = picks[index];
-    const score = calculatePromptScore(prompt, moodKey, analysis);
+    const { prompt, moodKey, fixed } = picks[index];
+    const score = fixed ? null : calculatePromptScore(prompt, moodKey, analysis);
     card.dataset.score = score == null ? "" : String(score);
     card.dataset.mood = moodKey;
     const matchEl = card.querySelector(".match");
-    if (score == null) {
+    if (fixed) {
+      matchEl.textContent = `${moodKey}의 마음을 위한 글감`;
+    } else if (score == null) {
       matchEl.textContent = "기록이 쌓이면 맞춤 추천돼요";
     } else {
       const moodLabel = moodKey === "default" ? "균형" : moodKey;
@@ -1519,7 +1689,28 @@ function renderPromptRecommendations() {
   const metaHtml = formatPromptMeta(analysis);
   if (meta && meta.innerHTML !== metaHtml) meta.innerHTML = metaHtml;
   const homePrompt = document.getElementById("home-prompt-teaser");
-  if (homePrompt && picks[0]) homePrompt.textContent = picks[0].prompt.title;
+  if (homePrompt && recommended[0]) homePrompt.textContent = recommended[0].prompt.title;
+}
+function renderPromptCategories() {
+  const bar = document.getElementById("prompt-categories");
+  if (!bar) return;
+  const moods = getPromptMoodKeys();
+  if (state.promptCategory !== "recommended" && !moods.includes(state.promptCategory)) state.promptCategory = "recommended";
+  const items = [{ id: "recommended", emoji: "✦", label: "추천" }, ...moods.map((id) => {
+    const emotion = getEmotionById(id);
+    return { id, emoji: emotion?.emoji || "✎", label: emotion?.label || id };
+  })];
+  const signature = items.map((item) => item.id).join("|");
+  if (bar.dataset.signature !== signature) {
+    bar.dataset.signature = signature;
+    bar.innerHTML = items.map((item) => `<button type="button" role="tab" data-category="${escapeHtml(item.id)}"><span aria-hidden="true">${item.emoji}</span>${escapeHtml(item.label)}</button>`).join("");
+  }
+  bar.querySelectorAll("[data-category]").forEach((button) => {
+    const active = button.dataset.category === state.promptCategory;
+    button.classList.toggle("active", active);
+    button.setAttribute("aria-selected", String(active));
+    button.tabIndex = active ? 0 : -1;
+  });
 }
 function selectPromptSlot(slot) {
   document.querySelectorAll(".prompt-slot").forEach((card) => {
@@ -1533,7 +1724,9 @@ async function refreshPrompts() {
   const refreshBtn = document.getElementById("prompt-refresh-btn");
   if (refreshBtn?.disabled) return;
   const analysis = analyzeEmotionsFromRecent(14);
-  const key = analysis.total === 0 ? "default" : (promptByMood[analysis.dominantMood] ? analysis.dominantMood : "default");
+  const key = state.promptCategory !== "recommended" && promptByMood[state.promptCategory]
+    ? state.promptCategory
+    : analysis.total === 0 ? "default" : (promptByMood[analysis.dominantMood] ? analysis.dominantMood : "default");
   promptRotation[key] = (promptRotation[key] || 0) + 1;
   await animatePromptRefresh(() => renderPromptRecommendations());
   showToast("새 글감을 골랐어요");
@@ -1568,6 +1761,7 @@ function openRecordDetail(record, returnPage = "records") {
   moodEl.className = `emotion-badge ${getEmotionChipClass(record.mood)}`;
   moodEl.innerHTML = `<b aria-hidden="true">${moodToEmoji(record.mood)}</b>${escapeHtml(parseMoodLabel(record.mood) || "기록")}`;
   document.getElementById("record-body").textContent = record.body;
+  document.getElementById("record-tags").innerHTML = tagsHtml(record.tags);
   document.getElementById("record-summary").textContent = `“${record.summary || record.body.slice(0, 60)}”`;
   go("record-detail");
 }
@@ -1592,10 +1786,11 @@ function createRecordRow(record, returnPage = "records") {
       <div>${emotionBadgeHtml(record.mood)}<span>${escapeHtml(formatEntryDate(record))}</span></div>
       <h4>${escapeHtml(record.title)}</h4>
       <p>${escapeHtml(record.body)}</p>
+      ${tagsHtml(record.tags)}
       ${summary}
     </div>
     <div class="item-actions">
-      <button type="button" data-row-action="open" aria-label="${escapeHtml(record.title)} 자세히 보기"><svg class="icon" aria-hidden="true"><use href="#i-chevron"/></svg></button>
+      <button type="button" data-row-action="edit" aria-label="${escapeHtml(record.title)} 수정"><svg class="icon" aria-hidden="true"><use href="#i-pen"/></svg></button>
       <button type="button" class="danger" data-row-action="delete" aria-label="${escapeHtml(record.title)} 삭제"><svg class="icon" aria-hidden="true"><use href="#i-trash"/></svg></button>
     </div>`;
   bindActivate(row, (event) => {
@@ -1603,6 +1798,11 @@ function createRecordRow(record, returnPage = "records") {
     if (action === "delete") {
       event.stopPropagation();
       void deleteRecordWithConfirm(record);
+      return;
+    }
+    if (action === "edit") {
+      event.stopPropagation();
+      editRecord(record);
       return;
     }
     openRecordDetail(record, returnPage);
@@ -1617,7 +1817,8 @@ function createEntryCard(record) {
   card.setAttribute("aria-label", `${record.title} 기록 열기`);
   card.innerHTML = `<div class="entry-top">${emotionBadgeHtml(record.mood)}<span>${escapeHtml(formatEntryDate(record))}</span></div>
     <h4>${escapeHtml(record.title)}</h4>
-    <p>${escapeHtml(record.summary || record.body)}</p>`;
+    <p>${escapeHtml(record.summary || record.body)}</p>
+    ${tagsHtml(record.tags)}`;
   bindActivate(card, () => openRecordDetail(record, "home"));
   return card;
 }
@@ -1639,7 +1840,10 @@ function renderRecordsPage() {
   const search = String(document.getElementById("records-search")?.value || "").trim().toLowerCase();
   let rows = [...state.records];
   if (moodFilter !== "all") rows = rows.filter((r) => moodMatchesFilter(r.mood, moodFilter));
-  if (search) rows = rows.filter((r) => `${r.title} ${r.body} ${r.summary}`.toLowerCase().includes(search));
+  if (search) {
+    const term = search.replace(/^#/, "");
+    rows = rows.filter((r) => `${r.title} ${r.body} ${r.summary} ${(r.tags || []).join(" ")}`.toLowerCase().includes(term));
+  }
   const sortKey = (r) => `${recordDateKey(r)}|${r.createdAt || ""}`;
   rows.sort((a, b) => (dateFilter === "oldest" ? sortKey(a).localeCompare(sortKey(b)) : sortKey(b).localeCompare(sortKey(a))));
   box.innerHTML = "";
@@ -1849,11 +2053,56 @@ function renderAnalysis() {
   else if (last < prev) caption.textContent = `이번 달은 지난달보다 ${prev - last}편 적어요. 짧은 한 줄도 충분해요.`;
   else caption.textContent = "지난달과 비슷한 속도로 꾸준히 기록하고 있어요.";
 
+  renderTopics(records);
   const keywords = extractKeywords(records, 8);
   const cloud = document.getElementById("analysis-keywords");
   cloud.innerHTML = keywords.length
     ? keywords.map(([word], index) => `<span class="word-${Math.min(3, Math.floor(index / 2))}">${escapeHtml(word)}</span>`).join("")
     : '<span class="word-empty">기록 속 단어가 모이면 이곳에 피어나요.</span>';
+}
+
+function renderTopics(records) {
+  const box = document.getElementById("analysis-topics");
+  const caption = document.getElementById("analysis-topics-caption");
+  if (!box) return;
+  const byTopic = new Map();
+  const add = (topic, record) => {
+    if (!byTopic.has(topic)) byTopic.set(topic, []);
+    const list = byTopic.get(topic);
+    if (!list.includes(record)) list.push(record);
+  };
+  let fromTags = false;
+  for (const record of records) {
+    for (const tag of record.tags || []) {
+      add(tag, record);
+      fromTags = true;
+    }
+  }
+  if (!fromTags) {
+    const candidates = extractKeywords(records, 12).map(([word]) => word);
+    for (const record of records) {
+      const text = `${record.title} ${record.body}`;
+      candidates.filter((word) => text.includes(word)).forEach((word) => add(word, record));
+    }
+  }
+  const topics = [...byTopic.entries()]
+    .filter(([, list]) => list.length >= (records.length > 3 ? 2 : 1))
+    .sort((a, b) => b[1].length - a[1].length || a[0].localeCompare(b[0], "ko"))
+    .slice(0, 3);
+  if (!topics.length) {
+    box.innerHTML = '<p class="caption">기록이 쌓이면 자주 돌아오는 이야기를 묶어 드려요.</p>';
+    if (caption) caption.hidden = true;
+    return;
+  }
+  if (caption) {
+    caption.hidden = false;
+    caption.textContent = fromTags ? "기록에 붙인 태그를 바탕으로 묶었어요." : "자주 쓴 단어를 바탕으로 묶었어요. 태그를 붙이면 더 정확해져요.";
+  }
+  box.innerHTML = topics.map(([topic, list], index) => {
+    const share = Math.round((list.length / records.length) * 100);
+    const titles = list.slice(0, 2).map((record) => record.title).join(", ");
+    return `<div><span>${String(index + 1).padStart(2, "0")}</span><p><b>${escapeHtml(topic)}</b>${escapeHtml(titles)}</p><em>${share}%</em></div>`;
+  }).join("");
 }
 
 /* ---------- Report page ---------- */
@@ -2015,6 +2264,7 @@ async function reloadRecords() {
     }
   }
   renderRecordsUI();
+  checkRecordReminder();
 }
 function renderRecordsUI() {
   renderHomeRecords();
@@ -2722,8 +2972,9 @@ function bindSettingsPage() {
     if (!button || !page.contains(button)) return;
     const action = button.dataset.settingsAction;
     if (action === "theme") toggleTheme(event);
+    else if (action === "reminder") void toggleRecordReminder();
     else if (action === "logout") void logout();
-    else if (action === "password" || action === "backup") go(action);
+    else if (["password", "backup", "ai-guide", "privacy"].includes(action)) go(action);
   });
   page.querySelectorAll('[role="radiogroup"]').forEach((group) => {
     group.addEventListener("keydown", (event) => {
@@ -2886,10 +3137,23 @@ function bindAppUI() {
   // Records + writer
   on("writer-toggle", "click", () => {
     const open = byId("diary-editor")?.hidden;
-    if (open) openWriter();
-    else setEditorOpen(false);
+    if (open) openWriter({ reset: Boolean(state.editingRecordId) });
+    else {
+      if (state.editingRecordId) resetWriterForm();
+      setEditorOpen(false);
+    }
   });
   on("writing-form", "submit", (event) => void saveManualDiary(event));
+  on("manual-ai-btn", "click", () => void previewAiSummary());
+  on("manual-body", "input", renderAiDraft);
+  on("manual-cancel-edit", "click", () => {
+    resetWriterForm();
+    setEditorOpen(false);
+  });
+  on("record-edit-btn", "click", () => {
+    const record = state.records.find((item) => String(item.id) === String(state.selectedRecordId));
+    editRecord(record);
+  });
   on("records-search", "input", renderRecordsPage);
   on("records-empty-write", "click", () => openWriter({ reset: true }));
   on("ocr-gallery-file", "change", (event) => previewOcrFile(event.target.files?.[0]));
@@ -2953,6 +3217,23 @@ function bindAppUI() {
     if (selected) startPromptDiary(selected);
   });
   on("prompt-refresh-btn", "click", () => void refreshPrompts());
+  on("prompt-categories", "click", (event) => {
+    const button = event.target.closest("[data-category]");
+    if (!button || button.dataset.category === state.promptCategory) return;
+    state.promptCategory = button.dataset.category;
+    selectPromptSlot(document.querySelector(".prompt-slot"));
+    renderPromptRecommendations();
+  });
+  on("prompt-categories", "keydown", (event) => {
+    if (!["ArrowLeft", "ArrowRight"].includes(event.key)) return;
+    const buttons = [...byId("prompt-categories").querySelectorAll("[data-category]")];
+    const index = buttons.findIndex((button) => button.dataset.category === state.promptCategory);
+    const next = buttons[(index + (event.key === "ArrowRight" ? 1 : buttons.length - 1)) % buttons.length];
+    if (!next) return;
+    event.preventDefault();
+    next.click();
+    next.focus();
+  });
 
   // Fortune
   on("fortune-open-btn", "click", openTodayFortune);

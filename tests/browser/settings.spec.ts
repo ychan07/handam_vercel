@@ -63,7 +63,7 @@ for (const width of [360, 390, 768]) for (const theme of ["light", "dark"]) {
     await expect(page.locator(".bottom-nav").getByRole("button", { name: "마이페이지", exact: true })).toHaveAttribute("aria-current", "page");
     await expect(page.locator(".bottom-nav .nav-item")).toHaveText(["홈", "나의 기록", "분석", "회고", "마이페이지"]);
     await expect(settings.getByText("한담 PRO")).toHaveCount(0);
-    await expect(settings.getByText("기록 알림", { exact: true })).toHaveCount(0);
+    await expect(settings.getByRole("switch", { name: "기록 알림" })).toHaveAttribute("aria-checked", "true");
     await expect(settings.getByText("준비 중", { exact: true })).toHaveCount(0);
     await expect(settings.getByText("요금제에 따라 달라요", { exact: true })).toHaveCount(0);
     await expect(settings.locator(".seg-pill").first()).toBeHidden();

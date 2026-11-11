@@ -31,10 +31,14 @@
 | `aiModel` | string | 사용한 Gemini 모델, AI 미사용 시 빈 문자열 |
 | `summaryQuality` | string | 이 요약에 사용한 품질 설정 |
 | `summaryGenerated` | boolean | Gemini가 요약을 생성했는지 여부 |
-| `entryDate` | `YYYY-MM-DD` | 일기 날짜 |
-| `createdAt` | timestamp | 생성 시각 |
+| `tags` | string 배열 (선택, 최대 10개) | 기록 태그. 예: `["산책", "봄"]` |
+| `entryDate` | `YYYY-MM-DD` | 일기 날짜 (작성 시 오늘 또는 지난 날짜 선택) |
+| `createdAt` | timestamp | 생성 시각. 수정해도 바뀌지 않음 |
 | `syncedAt` | timestamp | Firestore 동기화 시각 |
 | `updatedAt` | timestamp | 마지막 갱신 시각 |
+
+일기 수정은 본인만 할 수 있고 `uid`, `createdAt`은 바꿀 수 없습니다 (`firestore.rules`의 `allow update`).
+**`tags` 필드와 수정 기능을 쓰려면 바뀐 `firestore.rules`를 배포해야 합니다:** `firebase deploy --only firestore:rules`
 
 ## 서버 전용 컬렉션
 
