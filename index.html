@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<meta name="theme-color" content="#F4F1EA">
+<meta name="theme-color" content="#FBFAF6">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="한담">
@@ -13,8 +13,9 @@
 <link rel="apple-touch-icon" sizes="180x180" href="./apple-touch-icon.png">
 <link rel="icon" type="image/svg+xml" href="./icons/handam-feather.svg">
 <title>한담 (Handam)</title>
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Nanum+Myeongjo:wght@400;700;800&display=swap">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@400;700&family=Noto+Sans+KR:wght@400;500;600;700&display=swap">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 <link rel="stylesheet" href="./styles.css">
 <link rel="stylesheet" href="./ui-dist/ui.css" id="ui-styles">
@@ -23,311 +24,571 @@
 <div id="splash-root"></div>
 <div id="fortune-loading-root"></div>
 <div id="admin-root" class="handam-admin" hidden><div id="admin-app"></div><div id="admin-portals"></div></div>
-<div class="device app-shell--loading">
+
+<!-- Line icons (lucide-style) used by the header, navigation and cards -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+  <defs>
+    <symbol id="i-home" viewBox="0 0 24 24"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V20a1 1 0 0 0 1 1h4v-6h4v6h4a1 1 0 0 0 1-1V9.5"/></symbol>
+    <symbol id="i-notebook" viewBox="0 0 24 24"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/></symbol>
+    <symbol id="i-chart" viewBox="0 0 24 24"><path d="M3 21h18"/><path d="M6 17V11M10 17V6M14 17v-8M18 17V8"/><path d="m4 9 5-4 4 3 7-5"/></symbol>
+    <symbol id="i-report" viewBox="0 0 24 24"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h6M9 9h2"/></symbol>
+    <symbol id="i-user" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></symbol>
+    <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></symbol>
+    <symbol id="i-sparkles" viewBox="0 0 24 24"><path d="M10 3.5 11.6 8a2 2 0 0 0 1.3 1.3l4.6 1.7-4.6 1.6a2 2 0 0 0-1.3 1.3L10 18.5l-1.6-4.6a2 2 0 0 0-1.3-1.3L2.5 11l4.6-1.7A2 2 0 0 0 8.4 8z"/><path d="M19 3v4M21 5h-4M18 16v4M20 18h-4"/></symbol>
+    <symbol id="i-chevron" viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></symbol>
+    <symbol id="i-leaf" viewBox="0 0 24 24"><path d="M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.5 19 2c1 2 2 4.2 2 8 0 5.5-4.8 10-10 10Z"/><path d="M2 21c0-3 1.9-5.4 5.1-6C9.5 14.5 12 13 13 12"/></symbol>
+    <symbol id="i-pen" viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+    <symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></symbol>
+    <symbol id="i-upload" viewBox="0 0 24 24"><path d="M12 15V3M7 8l5-5 5 5"/><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/></symbol>
+    <symbol id="i-camera" viewBox="0 0 24 24"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3z"/><circle cx="12" cy="13" r="3.5"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></symbol>
+    <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></symbol>
+    <symbol id="i-trash" viewBox="0 0 24 24"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6M10 11v6M14 11v6"/></symbol>
+    <symbol id="i-calendar" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></symbol>
+    <symbol id="i-flame" viewBox="0 0 24 24"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.4-.5-2-1-3-1.1-2.1-.2-4 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.2.4-2.3 1-3.3.3 1.4 1.4 2.8 2.5 2.8z"/></symbol>
+    <symbol id="i-heart" viewBox="0 0 24 24"><path d="M19 14c1.5-1.5 3-3.2 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.8 0-3 .5-4.5 2-1.5-1.5-2.7-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4 3 5.5l7 7z"/></symbol>
+    <symbol id="i-moon" viewBox="0 0 24 24"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9z"/></symbol>
+    <symbol id="i-key" viewBox="0 0 24 24"><circle cx="7.5" cy="15.5" r="5.5"/><path d="m21 2-9.6 9.6M15.5 7.5l3 3L22 7l-3-3"/></symbol>
+    <symbol id="i-download" viewBox="0 0 24 24"><path d="M12 3v12M7 10l5 5 5-5"/><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/></symbol>
+    <symbol id="i-logout" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/></symbol>
+    <symbol id="i-rotate" viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-3-6.7L21 8"/><path d="M21 3v5h-5"/></symbol>
+    <symbol id="i-back" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></symbol>
+    <symbol id="i-cake" viewBox="0 0 24 24"><path d="M20 21v-8a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8M4 16s.5-1 2-1 2.5 2 4 2 2.5-2 4-2 2.5 2 4 2 2-1 2-1M2 21h20M7 8v3M12 8v3M17 8v3M7 4h.01M12 4h.01M17 4h.01"/></symbol>
+    <symbol id="i-quote" viewBox="0 0 24 24"><path d="M3 21c3 0 7-1 7-8V5c0-1.2-.8-2-2-2H4c-1.2 0-2 .8-2 2v6c0 1.2.8 2 2 2h3c0 3-2 5-4 5zM14 21c3 0 7-1 7-8V5c0-1.2-.8-2-2-2h-4c-1.2 0-2 .8-2 2v6c0 1.2.8 2 2 2h3c0 3-2 5-4 5z"/></symbol>
+  </defs>
+</svg>
+
+<div class="device app-shell app-shell--loading">
+
+  <!-- ============ APP HEADER ============ -->
+  <header class="page-header" id="app-header">
+    <button type="button" class="header-brand" id="header-brand" aria-label="한담 홈으로 이동"><span aria-hidden="true">ㅎ</span><b>한담</b></button>
+    <div class="header-title">
+      <p id="home-greeting">좋은 하루예요</p>
+      <h1 id="header-title">오늘의 한담</h1>
+    </div>
+    <button type="button" class="profile" id="header-profile" aria-label="마이페이지 열기"><span id="header-avatar" aria-hidden="true">한</span></button>
+  </header>
 
   <!-- ============ HOME ============ -->
   <div id="page-home" class="page active">
-    <div class="pad">
-      <div class="topbar reveal" style="--d:.02s">
+    <div class="page-body home-page">
+      <section class="welcome reveal" style="--d:.02s">
         <div>
-          <div class="brand">
-            <div class="brand-mark"><i class="fa-solid fa-feather-pointed"></i></div>
-            <span class="brand-name">HANDAM · 한담</span>
+          <p class="eyebrow" id="home-date">오늘</p>
+          <h2>오늘도, 내 마음에<br><em>잠시 머물러 보세요.</em></h2>
+          <p>기록을 넘어, 나를 이해하는 시간.</p>
+          <button type="button" class="btn btn-primary" id="home-write-btn">
+            <svg class="icon" aria-hidden="true"><use href="#i-plus"/></svg>새로운 기록 작성하기
+          </button>
+        </div>
+        <div class="welcome-art" aria-hidden="true">
+          <svg viewBox="0 0 360 270" fill="none">
+            <circle cx="236" cy="150" r="74" fill="#EFE6D2" opacity=".75"/>
+            <circle cx="236" cy="150" r="52" fill="#F6F0E2"/>
+            <path d="M236 84c7 41 19 55 60 66-41 11-53 25-60 66-7-41-19-55-60-66 41-11 53-25 60-66z" fill="#BAC7B6"/>
+            <path d="M70 270c18-46 34-96 44-150" stroke="#A9B8A7" stroke-width="2" stroke-linecap="round"/>
+            <path d="M104 168c-30-6-48 6-52 28 26 4 44-6 52-28z" stroke="#A9B8A7" stroke-width="2"/>
+            <path d="M112 126c22-22 42-26 58-14-16 20-36 24-58 14z" stroke="#A9B8A7" stroke-width="2"/>
+            <path d="M96 208c22-14 40-14 52 0-20 12-38 12-52 0z" stroke="#A9B8A7" stroke-width="2"/>
+            <path d="M352 270c-6-38-16-62-30-80" stroke="#A9B8A7" stroke-width="2" stroke-linecap="round"/>
+            <path d="M334 212c-22-2-34 10-34 26 20 0 32-10 34-26z" stroke="#A9B8A7" stroke-width="2"/>
+          </svg>
+        </div>
+      </section>
+
+      <section class="today-guide reveal" style="--d:.08s" aria-labelledby="home-guide-title">
+        <div class="home-section-head">
+          <p>오늘을 위한 작은 한담</p>
+          <h3 id="home-guide-title">가볍게 시작해 보세요</h3>
+        </div>
+        <div class="daily-cards">
+          <button type="button" class="fortune-peek" id="home-fortune-card">
+            <span class="daily-icon"><svg class="icon" aria-hidden="true"><use href="#i-sun"/></svg></span>
+            <span class="daily-copy">
+              <small>오늘의 운세</small>
+              <b id="home-fortune-quote">오늘 내게 찾아올 좋은 기운은?</b>
+              <em id="home-fortune-lucky-text">한 장의 운세를 열어 보세요</em>
+            </span>
+            <svg class="icon chevron" aria-hidden="true"><use href="#i-chevron"/></svg>
+          </button>
+          <button type="button" class="question-peek" id="home-question-card">
+            <span class="daily-icon"><svg class="icon" aria-hidden="true"><use href="#i-sparkles"/></svg></span>
+            <span class="daily-copy">
+              <small>오늘의 질문</small>
+              <b id="home-prompt-teaser">오늘 나를 미소 짓게 한 순간은?</b>
+              <em>질문을 골라 기록을 시작해요</em>
+            </span>
+            <svg class="icon chevron" aria-hidden="true"><use href="#i-chevron"/></svg>
+          </button>
+        </div>
+      </section>
+
+      <section class="quick-section reveal" style="--d:.14s" aria-label="이번 주 마음 일기">
+        <div class="card week-card home-week-card" id="home-week-card"
+             role="button" tabindex="0" aria-haspopup="dialog" aria-controls="week-stats-sheet" aria-expanded="false">
+          <div class="week-card-head">
+            <div>
+              <p>THIS WEEK</p>
+              <h3>이번 주 마음 일기</h3>
+            </div>
+            <span class="week-card-summary">
+              <span id="home-week-summary">0일 기록</span>
+              <svg class="icon home-week-chevron" aria-hidden="true"><use href="#i-chevron"/></svg>
+            </span>
           </div>
-          <div class="muted" style="font-size:13px;font-weight:700" id="home-date">오늘</div>
-          <h1 class="home-greeting-title" style="margin-top:3px" id="home-greeting">좋은 아침이에요,<br>한담님</h1>
+          <div class="weekstrip" id="home-weekstrip">
+            <div class="day"><span class="lbl">월</span><div class="dot"></div></div>
+            <div class="day"><span class="lbl">화</span><div class="dot"></div></div>
+            <div class="day"><span class="lbl">수</span><div class="dot"></div></div>
+            <div class="day"><span class="lbl">목</span><div class="dot"></div></div>
+            <div class="day"><span class="lbl">금</span><div class="dot"></div></div>
+            <div class="day"><span class="lbl">토</span><div class="dot"></div></div>
+            <div class="day"><span class="lbl">일</span><div class="dot"></div></div>
+          </div>
         </div>
-        <button class="iconbtn" onclick="toggleTheme()" id="theme-btn"><i class="fa-solid fa-moon"></i></button>
-      </div>
+      </section>
 
-      <!-- Weekly mood strip -->
-      <div class="card tap reveal home-week-card" id="home-week-card" style="--d:.07s;padding:18px"
-           role="button" tabindex="0" aria-haspopup="dialog" aria-controls="week-stats-sheet" aria-expanded="false">
-        <div style="display:flex;justify-content:space-between;align-items:center">
-          <span class="h-sec">이번 주 마음 일기</span>
-          <span style="display:flex;align-items:center;gap:8px">
-            <span class="muted" id="home-week-summary" style="font-size:12px;font-weight:700">0일 기록</span>
-            <i class="fa-solid fa-chevron-right home-week-chevron" aria-hidden="true"></i>
-          </span>
+      <section class="home-recent reveal" style="--d:.2s" aria-labelledby="home-recent-title">
+        <div class="home-section-head with-action">
+          <div>
+            <p>다시 펼쳐 보는 마음</p>
+            <h3 id="home-recent-title">최근의 기록</h3>
+          </div>
+          <button type="button" class="text-button" id="home-records-all">전체 보기<svg class="icon" aria-hidden="true"><use href="#i-chevron"/></svg></button>
         </div>
-        <div class="weekstrip" id="home-weekstrip">
-          <div class="day"><span class="lbl">월</span><div class="dot"></div></div>
-          <div class="day"><span class="lbl">화</span><div class="dot"></div></div>
-          <div class="day"><span class="lbl">수</span><div class="dot"></div></div>
-          <div class="day"><span class="lbl">목</span><div class="dot"></div></div>
-          <div class="day"><span class="lbl">금</span><div class="dot"></div></div>
-          <div class="day"><span class="lbl">토</span><div class="dot"></div></div>
-          <div class="day"><span class="lbl">일</span><div class="dot"></div></div>
-        </div>
-      </div>
-
-      <!-- Fortune hero -->
-      <div class="card fortune-hero tap reveal" style="--d:.12s;margin-top:14px" onclick="go('fortune')">
-        <div style="display:flex;justify-content:space-between;align-items:center">
-          <span class="eyebrow">오늘의 운세</span>
-          <span class="score-pill" id="home-fortune-pill"><i class="fa-solid fa-cake-candles"></i> 생일을 입력해보세요</span>
-        </div>
-        <p class="serif" id="home-fortune-quote" style="font-size:19px;font-weight:700;line-height:1.6;margin-top:12px">
-          생년월일을 입력하면<br>오늘의 운세 점수를 알려드려요.
-        </p>
-        <div id="home-fortune-lucky" style="display:flex;align-items:center;gap:8px;margin-top:16px;font-size:13px;font-weight:700">
-          <span class="swatch" id="home-fortune-swatch" style="background:#7FB7D9"></span>
-          <span id="home-fortune-lucky-text">운세 페이지에서 생일을 입력해 주세요</span>
-          <i class="fa-solid fa-chevron-right" style="margin-left:auto;font-size:12px;opacity:.8"></i>
-        </div>
-      </div>
-
-      <!-- AI prompt -->
-      <div class="card tap reveal" style="--d:.17s;margin-top:14px;background:var(--accent-soft);border-color:transparent"
-           onclick="go('prompts')">
-        <span class="eyebrow"><i class="fa-solid fa-wand-magic-sparkles"></i> AI 글감 추천</span>
-        <p style="font-size:15px;font-weight:800;line-height:1.55;margin-top:9px;color:var(--text)" id="home-prompt-teaser">
-          오늘의 글감을 확인해보세요.
-        </p>
-        <div style="display:flex;align-items:center;gap:6px;margin-top:12px;
-                    font-size:13px;font-weight:800;color:var(--accent)">
-          오늘의 글감 보러가기 <i class="fa-solid fa-arrow-right"></i>
-        </div>
-      </div>
-
-      <!-- Recent records -->
-      <div class="reveal" style="--d:.22s;display:flex;justify-content:space-between;align-items:center;margin:26px 4px 12px">
-        <span class="h-sec">최근 기록</span>
-        <button class="text-link" id="home-records-all" onclick="go('records')">전체보기</button>
-      </div>
-      <div class="card reveal" style="--d:.25s;padding:6px" id="home-record-list"></div>
+        <div class="recent-grid" id="home-record-list"></div>
+      </section>
     </div>
   </div>
 
   <!-- ============ FORTUNE ============ -->
   <div id="page-fortune" class="page">
-    <div class="pad" style="padding-bottom:132px">
-      <div class="backbar reveal" style="--d:.02s">
-        <button class="iconbtn" onclick="go('home')"><i class="fa-solid fa-arrow-left"></i></button>
-        <h1 class="h-page">오늘의 운세</h1>
+    <div class="page-body fortune-page">
+      <div class="fortune-heading reveal" style="--d:.02s">
+        <span aria-hidden="true"><svg class="icon" aria-hidden="true"><use href="#i-sun"/></svg></span>
+        <p class="eyebrow" id="fortune-date">오늘의 기운</p>
+        <h2>오늘의 운세</h2>
+        <p>정답을 알려주기보다, 오늘을 바라볼 다정한 힌트를 건네요.</p>
       </div>
 
-      <!-- Gauge -->
-      <div class="card fortune-hero reveal" style="--d:.06s;padding:0">
-        <div class="gauge-wrap">
-          <div class="gauge">
-            <svg width="188" height="188" viewBox="0 0 188 188">
-              <circle class="ring-bg" cx="94" cy="94" r="82" fill="none" stroke-width="13"/>
-              <circle id="gauge-ring" class="ring-fg" cx="94" cy="94" r="82" fill="none" stroke-width="13"
-                      stroke-dasharray="515.2" stroke-dashoffset="515.2"/>
-            </svg>
-            <div class="gauge-center">
-              <span class="gauge-num" id="gauge-num">—</span>
-              <span id="gauge-label" style="font-size:12px;font-weight:800;letter-spacing:.05em;opacity:.85">생일을 입력해 주세요</span>
-            </div>
-          </div>
-          <p class="serif" id="fortune-quote" style="text-align:center;font-size:15px;line-height:1.75;margin-top:6px;opacity:.95">
-            생년월일과 별자리를 바탕으로<br>오늘의 운세를 계산해 드려요.
-          </p>
+      <div class="fortune-card reveal" id="fortune-card" style="--d:.07s">
+        <div class="fortune-cover" id="fortune-cover">
+          <div class="fortune-orbit" aria-hidden="true"><i></i><span><svg class="icon" aria-hidden="true"><use href="#i-leaf"/></svg></span></div>
+          <small>HANDAM DAILY FORTUNE</small>
+          <h3>오늘 내 마음에 닿을<br>한마디를 만나 보세요.</h3>
+          <button type="button" class="fortune-open" id="fortune-open-btn">
+            <svg class="icon" aria-hidden="true"><use href="#i-sparkles"/></svg><span id="fortune-open-label">오늘의 운세 열어보기</span>
+          </button>
         </div>
-      </div>
-
-      <!-- Lucky -->
-      <div class="lucky-grid reveal" style="--d:.11s;margin-top:14px" id="fortune-lucky-grid">
-        <div class="card" style="padding:18px">
-          <div class="muted" style="font-size:12px;font-weight:800;margin-bottom:8px">별자리</div>
-          <div style="font-size:15px;font-weight:800" id="fortune-zodiac">—</div>
-        </div>
-        <div class="card" style="padding:18px">
-          <div class="muted" style="font-size:12px;font-weight:800;margin-bottom:8px">행운의 색</div>
-          <div style="display:flex;align-items:center;gap:9px">
-            <span class="swatch" id="fortune-lucky-swatch" style="background:#7FB7D9;border-color:var(--border)"></span>
-            <span style="font-size:15px;font-weight:800" id="fortune-lucky-color">—</span>
+        <div class="fortune-result" id="fortune-result" hidden>
+          <div class="fortune-seal"><b id="gauge-num">—</b><small>총운</small></div>
+          <p id="gauge-label">오늘의 한마디</p>
+          <h3 id="fortune-quote">생년월일을 바탕으로 오늘의 운세를 계산해 드려요.</h3>
+          <blockquote id="fortune-zodiac">—</blockquote>
+          <div class="fortune-details">
+            <div><span>총운</span><b id="fortune-tier">—</b><small>오늘의 흐름</small></div>
+            <div><span>행운의 색</span><b class="lucky-color"><i id="fortune-lucky-swatch"></i><span id="fortune-lucky-color">—</span></b><small>마음을 고르는 색</small></div>
+            <div><span>행운의 숫자</span><b id="fortune-lucky-numbers">—</b><small>오늘의 작은 신호</small></div>
           </div>
         </div>
-        <div class="card" style="padding:18px">
-          <div class="muted" style="font-size:12px;font-weight:800;margin-bottom:8px">행운의 숫자</div>
-          <div style="font-size:15px;font-weight:800" id="fortune-lucky-numbers">—</div>
-        </div>
       </div>
 
-      <!-- Category advice -->
-      <div class="reveal" style="--d:.16s;margin:24px 4px 12px"><span class="h-sec">분야별 조언</span></div>
-      <div class="card reveal" style="--d:.19s;padding:6px 20px">
+      <div class="card fortune-advice reveal" id="fortune-advice" style="--d:.11s" hidden>
+        <div class="section-title"><div><p>분야별 조언</p><h3>오늘의 세 가지 결</h3></div></div>
         <div class="advice-row">
-          <div class="advice-ic" style="background:#FADFD9;color:#BC5743"><i class="fa-solid fa-heart"></i></div>
-          <div style="flex:1">
-            <div style="font-size:14px;font-weight:800"><span id="fortune-love-title">연애운</span> <span class="muted" style="font-weight:700" id="fortune-love-score">· —</span></div>
-            <div class="muted" style="font-size:12px;font-weight:600" id="fortune-love-text">생일을 입력하면 분야별 운세를 볼 수 있어요.</div>
+          <span class="advice-ic rose"><svg class="icon" aria-hidden="true"><use href="#i-heart"/></svg></span>
+          <div>
+            <b><span id="fortune-love-title">연애운</span> <em id="fortune-love-score">· —</em></b>
+            <p id="fortune-love-text">생일을 입력하면 분야별 운세를 볼 수 있어요.</p>
             <div class="bar"><i id="fortune-love-bar" style="width:0%"></i></div>
           </div>
         </div>
         <div class="advice-row">
-          <div class="advice-ic" style="background:#FBEAD0;color:#B17A22"><i class="fa-solid fa-coins"></i></div>
-          <div style="flex:1">
-            <div style="font-size:14px;font-weight:800"><span id="fortune-money-title">금전운</span> <span class="muted" style="font-weight:700" id="fortune-money-score">· —</span></div>
-            <div class="muted" style="font-size:12px;font-weight:600" id="fortune-money-text">생일을 입력하면 분야별 운세를 볼 수 있어요.</div>
+          <span class="advice-ic sand"><svg class="icon" aria-hidden="true"><use href="#i-sun"/></svg></span>
+          <div>
+            <b><span id="fortune-money-title">금전운</span> <em id="fortune-money-score">· —</em></b>
+            <p id="fortune-money-text">생일을 입력하면 분야별 운세를 볼 수 있어요.</p>
             <div class="bar"><i id="fortune-money-bar" style="width:0%"></i></div>
           </div>
         </div>
         <div class="advice-row">
-          <div class="advice-ic" style="background:#E2EBE0;color:#5C7A56"><i class="fa-solid fa-briefcase"></i></div>
-          <div style="flex:1">
-            <div style="font-size:14px;font-weight:800"><span id="fortune-work-title">성공운</span> <span class="muted" style="font-weight:700" id="fortune-work-score">· —</span></div>
-            <div class="muted" style="font-size:12px;font-weight:600" id="fortune-work-text">생일을 입력하면 분야별 운세를 볼 수 있어요.</div>
+          <span class="advice-ic sage"><svg class="icon" aria-hidden="true"><use href="#i-leaf"/></svg></span>
+          <div>
+            <b><span id="fortune-work-title">성공운</span> <em id="fortune-work-score">· —</em></b>
+            <p id="fortune-work-text">생일을 입력하면 분야별 운세를 볼 수 있어요.</p>
             <div class="bar"><i id="fortune-work-bar" style="width:0%"></i></div>
           </div>
         </div>
       </div>
 
-      <button class="btn btn-line reveal" style="--d:.24s;margin-top:16px" id="fortune-birthday-btn" onclick="openSheet()">
-        <i class="fa-solid fa-cake-candles"></i> 생년월일 입력하기
+      <div class="card fortune-prompt reveal" id="fortune-prompt" style="--d:.15s" hidden>
+        <div>
+          <svg class="icon" aria-hidden="true"><use href="#i-pen"/></svg>
+          <span><small>운세를 오늘의 기록으로</small><b id="fortune-prompt-question">“오늘 천천히 바라보고 싶은 것은 무엇인가요?”</b></span>
+        </div>
+        <button type="button" class="btn btn-primary btn-block" id="fortune-write-btn">기록하기<svg class="icon" aria-hidden="true"><use href="#i-chevron"/></svg></button>
+      </div>
+
+      <button type="button" class="text-button fortune-birthday reveal" style="--d:.18s" id="fortune-birthday-btn">
+        <svg class="icon" aria-hidden="true"><use href="#i-cake"/></svg><span>생년월일 입력하기</span>
       </button>
-      <p class="muted reveal" style="--d:.27s;font-size:11px;text-align:center;margin-top:10px;font-weight:600">
-        생년월일·별자리 기반 계산 · 매일 0시 갱신
-      </p>
+      <p class="fortune-note reveal" style="--d:.2s"><svg class="icon" aria-hidden="true"><use href="#i-leaf"/></svg>오늘의 운세는 가볍게 마음을 돌아보기 위한 콘텐츠예요. 매일 0시에 갱신돼요.</p>
     </div>
   </div>
 
-  <!-- ============ RECORD / OCR ============ -->
-  <div id="page-diary" class="page">
-    <div class="pad">
-      <div class="reveal" style="--d:.02s;padding:16px 0 6px">
-        <span class="eyebrow" id="diary-date-label">오늘</span>
-        <h1 class="h-page" style="margin-top:5px">오늘을 기록해요</h1>
+  <!-- ============ RECORDS (나의 기록 + 작성) ============ -->
+  <div id="page-records" class="page">
+    <div class="page-body records-pad">
+      <div class="title-row reveal" style="--d:.02s">
+        <div>
+          <p class="eyebrow">나의 이야기를 차곡차곡</p>
+          <h2>나의 기록</h2>
+          <p>손글씨도, 오늘의 생각도 한곳에 편안히 담아 보세요.</p>
+        </div>
+        <button type="button" class="btn btn-primary" id="writer-toggle" aria-expanded="false" aria-controls="diary-editor">
+          <svg class="icon" aria-hidden="true"><use href="#i-plus"/></svg><span>새로운 기록</span>
+        </button>
       </div>
 
-      <!-- Step 1: upload -->
-      <div id="ocr-upload">
-        <div class="dropzone reveal" style="--d:.07s;margin-top:14px">
-          <div class="cam-badge"><i class="fa-solid fa-camera"></i></div>
-          <div style="font-size:15px;font-weight:800">손글씨 일기를 찍어주세요</div>
-          <div class="muted" style="font-size:12px;font-weight:600;margin-top:5px">
-            네이버 Clova OCR로 읽은 뒤 직접 입력란에 자동으로 채워드려요
+      <section class="diary-editor" id="diary-editor" hidden aria-label="새 기록 작성">
+        <div class="card upload-card">
+          <div class="step-title">
+            <span>01</span>
+            <div><h3>손글씨 기록 불러오기</h3><p>다이어리 사진을 올리면 AI가 글자를 읽어 드려요.</p></div>
           </div>
-          <input id="ocr-camera-file" class="input" type="file" accept="image/*" capture="environment" style="display:none">
-          <input id="ocr-gallery-file" class="input" type="file" accept="image/*" style="display:none">
-        </div>
-        <div class="reveal" style="--d:.12s;display:flex;gap:10px;margin-top:12px">
-          <button class="btn btn-primary" onclick="openCameraOCR()"><i class="fa-solid fa-camera"></i> 촬영하기</button>
-          <button class="btn btn-ghost" onclick="openGalleryOCR()"><i class="fa-solid fa-image"></i> 보관함</button>
-        </div>
-        <div class="card tap reveal" style="--d:.17s;margin-top:14px;display:flex;gap:13px;align-items:center;padding:16px" onclick="openManualDiary()">
-          <div class="diary-thumb" style="background:var(--accent-soft);color:var(--accent)">
-            <i class="fa-solid fa-keyboard"></i>
+          <div id="ocr-upload">
+            <label class="upload-zone" id="ocr-zone" for="ocr-gallery-file">
+              <input id="ocr-gallery-file" type="file" accept="image/*">
+              <span class="upload-icon"><svg class="icon" aria-hidden="true"><use href="#i-upload"/></svg></span>
+              <b id="ocr-zone-title">사진을 이곳에 올려 주세요</b>
+              <span id="ocr-zone-help">JPG, PNG 파일 · 손글씨가 밝게 보이도록 찍어 주세요</span>
+              <img id="ocr-preview" alt="" hidden>
+            </label>
+            <input id="ocr-camera-file" type="file" accept="image/*" capture="environment" hidden>
+            <div class="upload-actions">
+              <button type="button" class="btn btn-secondary" id="ocr-camera-btn"><svg class="icon" aria-hidden="true"><use href="#i-camera"/></svg>촬영하기</button>
+              <button type="button" class="btn btn-secondary" id="ocr-run-btn" disabled><svg class="icon" aria-hidden="true"><use href="#i-sparkles"/></svg>AI로 손글씨 읽기</button>
+            </div>
           </div>
-          <div style="flex:1">
-            <div style="font-size:14px;font-weight:800">직접 입력하기</div>
-            <div class="muted" style="font-size:12px;font-weight:600">사진 없이 바로 타이핑할게요</div>
+          <div id="ocr-loading" style="display:none">
+            <div class="scanframe">
+              <div class="scanline"></div>
+              <div class="ln" style="width:86%"></div>
+              <div class="ln" style="width:72%"></div>
+              <div class="ln" style="width:91%"></div>
+              <div class="ln" style="width:64%"></div>
+              <div class="ln" style="width:80%;margin-bottom:0"></div>
+            </div>
+            <div class="ocr-status-row">
+              <div class="spinner"></div>
+              <span id="ocr-status">손글씨를 인식하고 있어요…</span>
+            </div>
           </div>
-          <i class="fa-solid fa-chevron-right muted" style="font-size:12px"></i>
         </div>
-      </div>
 
-      <!-- Step 2: scanning -->
-      <div id="ocr-loading" style="display:none">
-        <div class="scanframe reveal" style="margin-top:14px">
-          <div class="scanline"></div>
-          <div class="ln" style="width:86%"></div>
-          <div class="ln" style="width:72%"></div>
-          <div class="ln" style="width:91%"></div>
-          <div class="ln" style="width:64%"></div>
-          <div class="ln" style="width:80%;margin-bottom:0"></div>
-        </div>
-        <div style="display:flex;align-items:center;gap:11px;margin-top:18px;justify-content:center">
-          <div class="spinner"></div>
-          <span style="font-size:13px;font-weight:800;color:var(--accent)" id="ocr-status">손글씨를 인식하고 있어요…</span>
-        </div>
-      </div>
+        <form class="card writing-card" id="writing-form" novalidate>
+          <div class="step-title">
+            <span>02</span>
+            <div><h3>기록 다듬기</h3><p>변환된 내용을 자유롭게 수정할 수 있어요.</p></div>
+          </div>
+          <div class="two-fields">
+            <label>날짜<input type="date" id="manual-date"></label>
+            <label>오늘의 감정<select id="manual-mood"></select></label>
+          </div>
+          <label>제목<input id="manual-title" type="text" placeholder="오늘의 기록에 제목을 붙여 주세요" autocomplete="off" maxlength="200"></label>
+          <label>기록<textarea id="manual-body" placeholder="오늘 마음에 머문 이야기를 적어 보세요. 사진을 올리면 인식한 글이 여기에 채워져요." autocomplete="off"></textarea></label>
+          <button type="submit" class="btn btn-primary btn-block" id="manual-save-btn">
+            <svg class="icon" aria-hidden="true"><use href="#i-check"/></svg><span data-button-label>오늘의 기록 저장하기</span>
+          </button>
+        </form>
+      </section>
 
+      <section class="archive reveal" style="--d:.08s" aria-labelledby="archive-title">
+        <div class="archive-head">
+          <div>
+            <p>기록 보관함</p>
+            <h3 id="archive-title">지나온 마음들 <span id="archive-count">0</span></h3>
+          </div>
+          <div class="archive-tools records-filter">
+            <label class="search">
+              <svg class="icon" aria-hidden="true"><use href="#i-search"/></svg>
+              <input type="search" id="records-search" placeholder="기록 내용 검색" aria-label="기록 내용 검색">
+            </label>
+            <div class="filter-row">
+              <select class="pill-select" id="filter-mood" aria-label="감정 필터">
+                <option value="all">감정 전체</option>
+              </select>
+              <select class="pill-select" id="filter-date" aria-label="정렬">
+                <option value="latest">최신순</option>
+                <option value="oldest">오래된순</option>
+              </select>
+            </div>
+          </div>
+        </div>
+        <div class="archive-list records-list-card" id="records-list"></div>
+        <div class="records-empty empty" id="records-empty" hidden>
+          <svg class="icon" aria-hidden="true"><use href="#i-pen"/></svg>
+          <h3>아직 기록이 없어요</h3>
+          <p>첫 마음을 남기면 이곳에 감정의 흐름이 쌓여요.</p>
+          <button type="button" class="btn btn-primary" id="records-empty-write">첫 기록 작성하기</button>
+        </div>
+      </section>
     </div>
   </div>
 
-  <!-- ============ PROMPTS ============ -->
+  <!-- ============ RECORD DETAIL ============ -->
+  <div id="page-record-detail" class="page">
+    <div class="page-body">
+      <div class="backbar reveal" style="--d:.02s">
+        <button type="button" class="iconbtn" id="record-detail-back" aria-label="기록 목록으로 돌아가기"><svg class="icon" aria-hidden="true"><use href="#i-back"/></svg></button>
+        <span>나의 기록</span>
+      </div>
+      <article class="card record-detail-card reveal" style="--d:.07s">
+        <div class="entry-top">
+          <span class="emotion-badge" id="record-mood">평온</span>
+          <span id="record-date">5월 17일</span>
+        </div>
+        <h2 id="record-title">한강에서의 산책</h2>
+        <p id="record-body">친구와 함께 한강을 걸으며 바람을 느꼈다.</p>
+      </article>
+      <div class="ai-result reveal" style="--d:.12s">
+        <div><svg class="icon" aria-hidden="true"><use href="#i-sparkles"/></svg>AI 요약</div>
+        <p id="record-summary">“기분 좋은 산책과 대화가 마음을 가볍게 만든 하루.”</p>
+      </div>
+      <button type="button" class="btn btn-danger btn-block reveal" style="--d:.17s" id="record-delete-btn">
+        <svg class="icon" aria-hidden="true"><use href="#i-trash"/></svg>이 기록 삭제하기
+      </button>
+    </div>
+  </div>
+
+  <!-- ============ ANALYSIS ============ -->
+  <div id="page-analysis" class="page">
+    <div class="page-body">
+      <div class="title-row reveal" style="--d:.02s">
+        <div>
+          <p class="eyebrow">기록이 들려주는 마음</p>
+          <h2>감정 분석</h2>
+          <p>감정을 판단하지 않고, 나를 이해할 작은 단서로 바라봅니다.</p>
+        </div>
+        <select class="pill-select period-select" id="analysis-period" aria-label="분석 기간">
+          <option value="3">최근 3개월</option>
+          <option value="1">최근 1개월</option>
+          <option value="12">최근 1년</option>
+          <option value="all">전체 기간</option>
+        </select>
+      </div>
+
+      <section class="card analysis-hero reveal" style="--d:.06s" aria-labelledby="records-insight-title">
+        <div class="analysis-copy">
+          <span><svg class="icon" aria-hidden="true"><use href="#i-sparkles"/></svg>한담의 마음 읽기</span>
+          <h3 id="records-insight-title">첫 마음을 기다리고 있어요</h3>
+          <p id="records-insight-copy">오늘의 작은 마음부터 천천히 남겨보세요.</p>
+        </div>
+        <div class="moon-graphic" aria-hidden="true"><i></i><i></i><i></i><span id="records-insight-emoji"><svg class="icon" aria-hidden="true"><use href="#i-moon"/></svg></span></div>
+      </section>
+
+      <div class="stats-row reveal" style="--d:.09s">
+        <div class="card"><span class="stat-icon sage"><svg class="icon" aria-hidden="true"><use href="#i-notebook"/></svg></span><div><span>기간 내 기록</span><strong id="analysis-total">0<small>편</small></strong></div></div>
+        <div class="card"><span class="stat-icon sand"><svg class="icon" aria-hidden="true"><use href="#i-calendar"/></svg></span><div><span>기록한 날</span><strong id="records-days-written">0일</strong></div></div>
+        <div class="card"><span class="stat-icon rose"><svg class="icon" aria-hidden="true"><use href="#i-flame"/></svg></span><div><span>최장 연속</span><strong id="records-longest-streak">0일</strong></div></div>
+      </div>
+
+      <section class="card mood-tracker reveal" style="--d:.12s" aria-labelledby="tracker-title">
+        <div class="mood-tracker-head">
+          <div>
+            <p>MOOD TRACKER</p>
+            <h3 id="tracker-title">이번 달 감정 캘린더</h3>
+            <span>하루의 마음을 색으로 한눈에 살펴보세요.</span>
+          </div>
+          <div class="calendar-nav">
+            <button type="button" id="tracker-prev" aria-label="이전 달"><svg class="icon" aria-hidden="true"><use href="#i-back"/></svg></button>
+            <button type="button" id="tracker-next" aria-label="다음 달"><svg class="icon" aria-hidden="true"><use href="#i-chevron"/></svg></button>
+          </div>
+        </div>
+        <div class="mood-weekdays" aria-hidden="true"><span>일</span><span>월</span><span>화</span><span>수</span><span>목</span><span>금</span><span>토</span></div>
+        <div class="mood-days" id="tracker-days"></div>
+        <div class="mood-legend" id="tracker-legend"></div>
+      </section>
+
+      <section class="card reveal" style="--d:.15s" aria-labelledby="donut-title">
+        <div class="section-title"><div><p>마음의 구성</p><h3 id="donut-title">주요 감정 비율</h3></div></div>
+        <div class="donut-wrap">
+          <div class="donut" id="analysis-donut"><span><b id="analysis-donut-count">0</b>개의 기록</span></div>
+          <div class="donut-legend" id="analysis-donut-legend"></div>
+        </div>
+        <div class="mood-distribution-bar" id="records-distribution-bar" role="img" aria-label="감정 기록 없음" hidden></div>
+        <div class="mood-distribution-legend" id="records-distribution-legend" hidden></div>
+      </section>
+
+      <section class="card trend-card reveal" style="--d:.18s" aria-labelledby="trend-title">
+        <div class="section-title"><div><p>시간의 흐름</p><h3 id="trend-title">월별 기록 변화</h3></div><span class="neutral-pill">기록 수</span></div>
+        <div class="line-chart" id="analysis-trend"></div>
+        <p class="caption" id="analysis-trend-caption">기록이 쌓이면 흐름을 보여드려요.</p>
+      </section>
+
+      <section class="card reveal" style="--d:.21s" aria-labelledby="keyword-title">
+        <div class="section-title"><div><p>자주 머문 생각</p><h3 id="keyword-title">기록 속 키워드</h3></div></div>
+        <div class="word-cloud" id="analysis-keywords"></div>
+      </section>
+
+      <div class="card gentle-note reveal" style="--d:.24s">
+        <svg class="icon" aria-hidden="true"><use href="#i-leaf"/></svg>
+        <div>
+          <b>기억해 주세요</b>
+          <p>이 분석은 마음을 평가하거나 진단하지 않아요. 기록 속 반복되는 흐름을 살펴보며, 지금의 나에게 필요한 것이 무엇인지 천천히 생각해 보는 데 활용해 주세요.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ REPORT (회고) ============ -->
+  <div id="page-report" class="page">
+    <div class="page-body">
+      <div class="report-top reveal" style="--d:.02s">
+        <div>
+          <p class="eyebrow" id="report-eyebrow">한 달의 마음을 천천히</p>
+          <h2 id="report-heading">월간 회고 리포트</h2>
+          <p>지나온 기록을 돌아보며 나를 더 깊이 이해해 보세요.</p>
+        </div>
+        <div>
+          <div class="report-tabs" role="tablist" aria-label="회고 기간 단위">
+            <button type="button" role="tab" class="active" aria-selected="true" data-report-mode="month">월간</button>
+            <button type="button" role="tab" aria-selected="false" data-report-mode="year">연간</button>
+          </div>
+          <select class="pill-select" id="report-period" aria-label="회고 기간"></select>
+        </div>
+      </div>
+
+      <section class="card monthly-hero reveal" style="--d:.06s">
+        <div>
+          <span id="report-hero-label">MONTHLY REFLECTION</span>
+          <h3 id="report-hero-title">첫 기록이 이 달의<br>이야기를 열어 줄 거예요</h3>
+          <p id="report-hero-copy">작은 한 줄도 충분해요.</p>
+        </div>
+        <div class="month-seal" aria-hidden="true"><span id="report-seal">—</span><small>마음의 기록</small></div>
+      </section>
+
+      <div class="report-stats reveal" style="--d:.09s">
+        <div class="card"><span>총 기록</span><strong id="report-total">0<small>회</small></strong><p id="report-total-diff">기록을 시작해 보세요</p></div>
+        <div class="card"><span>가장 많이 나타난 감정</span><div id="report-top-mood"><span class="neutral-pill">—</span></div><p id="report-top-mood-share">아직 없어요</p></div>
+        <div class="card"><span>기록한 날</span><strong id="report-days">0<small>일</small></strong><p>꾸준히 마음을 살폈어요</p></div>
+        <div class="card"><span>최장 연속</span><strong id="report-streak">0<small>일</small></strong><p>이어서 남긴 날</p></div>
+      </div>
+
+      <section class="card trend-card reveal" style="--d:.12s" aria-labelledby="report-trend-title">
+        <div class="section-title"><div><p id="report-trend-kicker">이번 달의 흐름</p><h3 id="report-trend-title">기록의 리듬</h3></div><span class="neutral-pill">기록 수</span></div>
+        <div class="line-chart" id="report-trend"></div>
+      </section>
+
+      <section class="card reveal" style="--d:.15s" aria-labelledby="report-keyword-title">
+        <div class="section-title"><div><p>자주 등장한 단어</p><h3 id="report-keyword-title">키워드 TOP 5</h3></div></div>
+        <div class="rank-list" id="report-keywords"></div>
+      </section>
+
+      <section class="card reveal" style="--d:.18s" aria-labelledby="report-memory-title">
+        <div class="section-title"><div><p>다시 꺼내 보고 싶은</p><h3 id="report-memory-title">기억에 남는 기록</h3></div></div>
+        <blockquote class="memory" id="report-memory">기록이 쌓이면 다시 꺼내 보고 싶은 문장을 골라 드려요.</blockquote>
+      </section>
+
+      <section class="card reveal" style="--d:.21s" aria-labelledby="report-events-title">
+        <div class="section-title"><div><p>이 시기의 장면</p><h3 id="report-events-title">주요 기록</h3></div></div>
+        <div class="event-list" id="report-events"></div>
+      </section>
+
+      <section class="reflection card reveal" style="--d:.24s" aria-labelledby="report-reflection-title">
+        <div><svg class="icon" aria-hidden="true"><use href="#i-sparkles"/></svg><span>한담의 회고</span></div>
+        <h3 id="report-reflection-title">기록이 모이면 이 시기를 다정하게 돌아봐 드릴게요.</h3>
+        <p id="report-reflection-copy">완벽하지 않아도 괜찮아요. 오늘의 한 줄이 내일의 나를 이해하는 단서가 됩니다.</p>
+        <div class="question-box"><span>이번 회고의 성찰 질문</span><b id="report-question">“지금 내 마음은 어떤 속도로 걷고 있나요?”</b></div>
+      </section>
+    </div>
+  </div>
+
+  <!-- ============ PROMPTS (오늘의 질문) ============ -->
   <div id="page-prompts" class="page">
-    <div class="pad">
-      <div class="reveal" style="--d:.02s;padding:16px 0 6px">
-        <span class="eyebrow"><i class="fa-solid fa-wand-magic-sparkles"></i> 맞춤 글감</span>
-        <h1 class="h-page" style="margin-top:5px">오늘은 무얼 써볼까요?</h1>
-      </div>
-      <div class="card reveal" style="--d:.07s;margin-top:14px;display:flex;align-items:center;gap:13px;padding:16px">
-        <div class="diary-thumb" style="background:var(--accent-soft);color:var(--accent)">
-          <i class="fa-solid fa-chart-simple"></i>
-        </div>
-        <div style="font-size:13px;font-weight:700;line-height:1.5;color:var(--text-soft)" id="prompt-meta">
-          최근 일기 <b style="color:var(--text)">0편</b>을 분석해<br>오늘의 마음에 어울리는 글감을 골랐어요.
-        </div>
+    <div class="page-body topic-page">
+      <div class="topic-header reveal" style="--d:.02s">
+        <span aria-hidden="true"><svg class="icon" aria-hidden="true"><use href="#i-sparkles"/></svg></span>
+        <p class="eyebrow">AI 글감 추천</p>
+        <h2>오늘은 무얼 써볼까요?</h2>
+        <p id="prompt-meta">최근 일기 <b>0편</b>을 분석해<br>오늘의 마음에 어울리는 글감을 골랐어요.</p>
       </div>
 
-      <div class="card prompt-card tap reveal prompt-slot" style="--d:.12s;margin-top:14px" onclick="startPromptDiary(this)">
-        <div style="display:flex;justify-content:space-between;align-items:center">
-          <span class="match"><i class="fa-solid fa-bolt"></i> 추천도 98%</span>
-          <span class="prompt-emoji" style="font-size:20px">🍜</span>
+      <section class="card question-card reveal" style="--d:.07s" aria-labelledby="question-title">
+        <div class="question-head">
+          <div><span>오늘의 질문</span><h3 id="question-title">마음에 닿는 질문을 골라 보세요</h3></div>
+          <button type="button" class="btn btn-secondary" id="prompt-refresh-btn" aria-label="다른 글감 추천받기">
+            <svg class="icon prompt-refresh-icon" aria-hidden="true"><use href="#i-rotate"/></svg><span>새로고침</span>
+          </button>
         </div>
-        <h3 style="font-size:16px;font-weight:800;margin-top:11px">가장 행복했던 한 끼</h3>
-        <p class="soft" style="font-size:13px;font-weight:600;line-height:1.6;margin-top:6px">
-          최근 일기에 ‘음식’ 키워드가 자주 보였어요. 가장 기억에 남는 맛은 무엇이었나요?
-        </p>
-      </div>
-
-      <div class="card prompt-card tap reveal prompt-slot" style="--d:.17s;margin-top:12px" onclick="startPromptDiary(this)">
-        <div style="display:flex;justify-content:space-between;align-items:center">
-          <span class="match"><i class="fa-solid fa-bolt"></i> 추천도 85%</span>
-          <span class="prompt-emoji" style="font-size:20px">🌱</span>
+        <div class="questions" role="radiogroup" aria-labelledby="question-title">
+          <button type="button" class="prompt-slot selected" role="radio" aria-checked="true">
+            <span class="prompt-emoji" aria-hidden="true">🍜</span>
+            <span class="prompt-copy"><span class="match">추천도 98%</span><h3>가장 행복했던 한 끼</h3><p>가장 기억에 남는 맛은 무엇이었나요?</p></span>
+            <i aria-hidden="true"><svg class="icon"><use href="#i-check"/></svg></i>
+          </button>
+          <button type="button" class="prompt-slot" role="radio" aria-checked="false">
+            <span class="prompt-emoji" aria-hidden="true">🌱</span>
+            <span class="prompt-copy"><span class="match">추천도 85%</span><h3>나를 성장시킨 실수</h3><p>그 과정에서 배운 점을 정리해 볼까요?</p></span>
+            <i aria-hidden="true"><svg class="icon"><use href="#i-check"/></svg></i>
+          </button>
+          <button type="button" class="prompt-slot" role="radio" aria-checked="false">
+            <span class="prompt-emoji" aria-hidden="true">💌</span>
+            <span class="prompt-copy"><span class="match">추천도 72%</span><h3>1년 뒤의 나에게</h3><p>지금의 목표들을 1년 뒤의 내가 읽는다면, 어떤 마음이 들까요?</p></span>
+            <i aria-hidden="true"><svg class="icon"><use href="#i-check"/></svg></i>
+          </button>
         </div>
-        <h3 style="font-size:16px;font-weight:800;margin-top:11px">나를 성장시킨 실수</h3>
-        <p class="soft" style="font-size:13px;font-weight:600;line-height:1.6;margin-top:6px">
-          지난주 프로젝트 고민을 기록하셨죠. 그 과정에서 배운 점을 정리해 볼까요?
-        </p>
-      </div>
-
-      <div class="card prompt-card tap reveal prompt-slot" style="--d:.22s;margin-top:12px" onclick="startPromptDiary(this)">
-        <div style="display:flex;justify-content:space-between;align-items:center">
-          <span class="match"><i class="fa-solid fa-bolt"></i> 추천도 72%</span>
-          <span class="prompt-emoji" style="font-size:20px">💌</span>
+        <div class="write-action">
+          <p>고른 질문이 기록의 제목으로 채워져요.</p>
+          <button type="button" class="btn btn-primary" id="prompt-write-btn"><svg class="icon" aria-hidden="true"><use href="#i-pen"/></svg>이 질문으로 기록하기</button>
         </div>
-        <h3 style="font-size:16px;font-weight:800;margin-top:11px">1년 뒤의 나에게</h3>
-        <p class="soft" style="font-size:13px;font-weight:600;line-height:1.6;margin-top:6px">
-          지금의 목표들을 1년 뒤의 내가 읽는다면, 어떤 마음이 들까요?
-        </p>
-      </div>
-
-      <button class="btn btn-line reveal" id="prompt-refresh-btn" style="--d:.27s;margin-top:16px" onclick="refreshPrompts()">
-        <i class="fa-solid fa-rotate prompt-refresh-icon"></i> 다른 글감 추천받기
-      </button>
+      </section>
     </div>
   </div>
 
-  <!-- ============ SETTINGS ============ -->
-  <div id="page-settings" class="page">
-    <div class="pad">
-      <div class="settings-heading reveal"><h1 class="h-page">설정</h1></div>
-
-      <div class="card settings-profile reveal">
-        <div class="avatar" id="settings-avatar" aria-hidden="true">한</div>
+  <!-- ============ MY PAGE (settings) ============ -->
+  <div id="page-settings" class="page profile-page">
+    <div class="page-body">
+      <section class="profile-hero settings-profile reveal" style="--d:.02s">
+        <div class="profile-avatar avatar" id="settings-avatar" aria-hidden="true">한</div>
         <div class="settings-identity">
-          <div id="settings-display-name">한담</div>
-          <div class="muted" id="settings-email">로그인이 필요해요</div>
+          <p>나의 한담</p>
+          <h2><span id="settings-display-name">한담</span>님</h2>
+          <span id="settings-email">로그인이 필요해요</span>
         </div>
+      </section>
+
+      <div class="profile-summary reveal" style="--d:.06s">
+        <button type="button" data-mypage-go="records"><strong id="mypage-total">0</strong><span>전체 기록</span></button>
+        <button type="button" data-mypage-go="report"><strong id="mypage-months">0</strong><span>함께한 달</span></button>
+        <button type="button" data-mypage-go="analysis"><strong id="mypage-streak">0일</strong><span>연속 기록</span></button>
       </div>
 
-      <section class="settings-section settings-preferences reveal" aria-labelledby="settings-screen-label">
-        <h2 class="group-label" id="settings-screen-label">화면</h2>
+      <section class="settings-group settings-preferences reveal" style="--d:.1s" aria-labelledby="settings-screen-label">
+        <p id="settings-screen-label">화면</p>
         <div class="list">
-          <button type="button" class="list-item settings-action" id="dark-switch" role="switch" aria-checked="false" data-settings-action="theme">
-            <span class="lead"><i class="fa-solid fa-moon" aria-hidden="true"></i> 다크 모드</span>
-            <span class="switch" aria-hidden="true"></span>
+          <button type="button" class="list-item setting-row settings-action" id="dark-switch" role="switch" aria-checked="false" aria-label="다크 모드" data-settings-action="theme">
+            <i aria-hidden="true"><svg class="icon"><use href="#i-moon"/></svg></i>
+            <span class="lead" aria-hidden="true"><b>다크 모드</b><small>밤에도 눈이 편안한 화면</small></span>
+            <span class="switch" aria-hidden="true"><u></u></span>
           </button>
         </div>
       </section>
 
-      <section class="settings-section settings-ai reveal" aria-labelledby="settings-ai-label">
-        <h2 class="group-label" id="settings-ai-label">AI 서비스 설정</h2>
+      <section class="settings-group settings-ai reveal" style="--d:.14s" aria-labelledby="settings-ai-label">
+        <p id="settings-ai-label">AI 서비스 설정</p>
         <div class="list">
           <div class="list-item settings-choice">
-            <div class="lead" id="settings-quality-label"><i class="fa-solid fa-gauge-high" aria-hidden="true"></i> 요약 방식</div>
+            <div class="lead" id="settings-quality-label"><i aria-hidden="true"><svg class="icon"><use href="#i-notebook"/></svg></i><b>요약 방식</b></div>
             <p class="settings-help" id="settings-quality-help">균형 · 원문의 흐름과 핵심을 고르게 살려요.</p>
             <div class="seg seg-elastic" role="radiogroup" aria-labelledby="settings-quality-label" aria-describedby="settings-quality-help" data-setting-segment="summaryQuality" data-setting-help="settings-quality-help">
               <button type="button" role="radio" aria-checked="false" tabindex="-1" data-value="표준" data-description="간결 · 핵심 사건과 감정을 짧고 직접적으로 정리해요.">간결</button><button type="button" role="radio" aria-checked="true" tabindex="0" class="on" data-value="고급" data-description="균형 · 원문의 흐름과 핵심을 고르게 살려요.">균형</button><button type="button" role="radio" aria-checked="false" tabindex="-1" data-value="최고" data-description="섬세 · 중요한 세부와 감정의 뉘앙스를 더 충실히 담아요.">섬세</button>
             </div>
           </div>
           <div class="list-item settings-choice">
-            <div class="lead" id="settings-persona-label"><i class="fa-solid fa-comment-dots" aria-hidden="true"></i> AI 페르소나</div>
+            <div class="lead" id="settings-persona-label"><i aria-hidden="true"><svg class="icon"><use href="#i-sparkles"/></svg></i><b>AI 페르소나</b></div>
             <p class="settings-help" id="settings-persona-help">따뜻한 공감형 · 감정을 헤아리는 말투로 정리해요.</p>
             <div class="seg seg-elastic" role="radiogroup" aria-labelledby="settings-persona-label" aria-describedby="settings-persona-help" data-setting-segment="persona" data-setting-help="settings-persona-help">
               <button type="button" role="radio" aria-checked="true" tabindex="0" class="on" data-value="따뜻한 공감형" data-description="따뜻한 공감형 · 감정을 헤아리는 말투로 정리해요.">따뜻한 공감형</button><button type="button" role="radio" aria-checked="false" tabindex="-1" data-value="담백한 정리형" data-description="담백한 정리형 · 핵심을 차분하고 간결하게 정리해요.">담백한 정리형</button>
@@ -336,187 +597,83 @@
         </div>
       </section>
 
-      <section class="settings-section settings-account reveal" aria-labelledby="settings-account-label">
-        <h2 class="group-label" id="settings-account-label">계정 · 데이터</h2>
+      <section class="settings-group settings-account reveal" style="--d:.18s" aria-labelledby="settings-account-label">
+        <p id="settings-account-label">계정 · 데이터</p>
         <div class="list">
-          <button type="button" class="list-item settings-action tap" data-settings-action="password">
-            <span class="lead"><i class="fa-solid fa-key" aria-hidden="true"></i> 비밀번호 변경</span>
-            <i class="fa-solid fa-chevron-right muted" aria-hidden="true"></i>
+          <button type="button" class="list-item setting-row settings-action" data-settings-action="password" aria-label="비밀번호 변경">
+            <i aria-hidden="true"><svg class="icon"><use href="#i-key"/></svg></i>
+            <span class="lead" aria-hidden="true"><b>비밀번호 변경</b><small>계정을 안전하게 지켜요</small></span>
+            <svg class="icon chevron" aria-hidden="true"><use href="#i-chevron"/></svg>
           </button>
-          <button type="button" class="list-item settings-action tap" data-settings-action="backup">
-            <span class="lead"><i class="fa-solid fa-database" aria-hidden="true"></i> 일기 백업 · 내보내기</span>
-            <i class="fa-solid fa-chevron-right muted" aria-hidden="true"></i>
+          <button type="button" class="list-item setting-row settings-action" data-settings-action="backup" aria-label="일기 백업 · 내보내기">
+            <i aria-hidden="true"><svg class="icon"><use href="#i-download"/></svg></i>
+            <span class="lead" aria-hidden="true"><b>일기 백업 · 내보내기</b><small>기록을 JSON 파일로 안전하게 보관해요</small></span>
+            <svg class="icon chevron" aria-hidden="true"><use href="#i-chevron"/></svg>
           </button>
-          <button type="button" class="list-item settings-action settings-logout tap" data-settings-action="logout">
-            <span class="lead"><i class="fa-solid fa-right-from-bracket" aria-hidden="true"></i> 로그아웃</span>
+          <button type="button" class="list-item setting-row settings-action settings-logout" data-settings-action="logout" aria-label="로그아웃">
+            <i aria-hidden="true"><svg class="icon"><use href="#i-logout"/></svg></i>
+            <span class="lead" aria-hidden="true"><b>로그아웃</b></span>
           </button>
         </div>
       </section>
-      <p class="settings-footer muted reveal">
-        한담 v1.0.0 · 변경 사항은 자동으로 동기화돼요.
+      <p class="app-version settings-footer reveal" style="--d:.22s">
+        HANDAM · 오늘의 마음을 위한 조용한 공간<br>버전 1.0.0 · 변경 사항은 자동으로 동기화돼요.
       </p>
-    </div>
-  </div>
-
-  <!-- ============ ALL RECORDS ============ -->
-  <div id="page-records" class="page">
-    <div class="pad records-pad">
-      <div class="backbar reveal" style="--d:.02s">
-        <button class="iconbtn" onclick="go('home')"><i class="fa-solid fa-arrow-left"></i></button>
-        <h1 class="h-page">전체 기록</h1>
-      </div>
-      <section class="records-overview reveal" style="--d:.05s" aria-labelledby="records-insight-title">
-        <div class="records-insight">
-          <div class="records-insight-emoji" id="records-insight-emoji" aria-hidden="true">📝</div>
-          <div>
-            <p class="records-kicker">지금까지의 마음</p>
-            <h2 id="records-insight-title">첫 마음을 기다리고 있어요</h2>
-            <p id="records-insight-copy">오늘의 작은 마음부터 천천히 남겨보세요.</p>
-          </div>
-        </div>
-        <div class="records-distribution-block">
-          <h3>감정 전체 분포</h3>
-          <div class="mood-distribution-bar" id="records-distribution-bar" role="img" aria-label="감정 기록 없음"></div>
-          <div class="mood-distribution-legend" id="records-distribution-legend"></div>
-        </div>
-        <div class="records-metrics">
-          <div><i class="fa-regular fa-calendar" aria-hidden="true"></i><span>기록한 날<strong id="records-days-written">0일</strong></span></div>
-          <div><i class="fa-solid fa-fire-flame-curved" aria-hidden="true"></i><span>최장 연속<strong id="records-longest-streak">0일</strong></span></div>
-        </div>
-      </section>
-      <div class="card records-filter reveal" style="--d:.08s;padding:16px;display:flex;gap:10px">
-        <select class="field" id="filter-mood">
-          <option value="all">감정 전체</option>
-        </select>
-        <select class="field" id="filter-date">
-          <option value="latest">최신순</option>
-          <option value="oldest">오래된순</option>
-        </select>
-      </div>
-      <div class="card records-list-card reveal" style="--d:.11s;padding:6px" id="records-list"></div>
-      <div class="records-empty" id="records-empty" hidden>
-        <i class="fa-regular fa-pen-to-square" aria-hidden="true"></i>
-        <strong>아직 기록이 없어요</strong>
-        <p>첫 마음을 남기면 이곳에 감정의 흐름이 쌓여요.</p>
-        <button class="btn btn-primary" onclick="go('diary')">첫 기록 작성하기</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- ============ RECORD DETAIL ============ -->
-  <div id="page-record-detail" class="page">
-    <div class="pad">
-      <div class="backbar reveal" style="--d:.02s">
-        <button class="iconbtn" onclick="goBackFromRecordDetail()"><i class="fa-solid fa-arrow-left"></i></button>
-        <h1 class="h-page">기록 상세</h1>
-      </div>
-      <div class="card reveal" style="--d:.07s">
-        <div style="display:flex;justify-content:space-between;align-items:center">
-          <span class="eyebrow" id="record-date">5월 17일</span>
-          <span class="chip emo-happy" id="record-mood">행복</span>
-        </div>
-        <h2 class="serif" id="record-title" style="font-size:22px;font-weight:800;line-height:1.45;margin-top:12px">한강에서의 산책</h2>
-        <p class="soft" id="record-body" style="font-size:14px;font-weight:600;line-height:1.8;margin-top:16px">
-          친구와 함께 한강을 걸으며 바람을 느꼈다.
-        </p>
-      </div>
-      <div class="card reveal" style="--d:.12s;margin-top:14px;background:var(--accent-soft);border-color:transparent">
-        <span class="eyebrow"><i class="fa-solid fa-wand-magic-sparkles"></i> AI 요약</span>
-        <p class="serif" id="record-summary" style="font-size:16px;font-weight:700;line-height:1.65;margin-top:9px;color:var(--text)">
-          “기분 좋은 산책과 대화가 마음을 가볍게 만든 하루.”
-        </p>
-      </div>
-      <button class="btn btn-line reveal" style="--d:.17s;margin-top:12px;color:#BC5743;border-color:#F3C9C2" onclick="deleteCurrentRecord()">
-        <i class="fa-solid fa-trash"></i> 이 기록 삭제하기
-      </button>
-    </div>
-  </div>
-
-  <!-- ============ MANUAL DIARY ============ -->
-  <div id="page-manual" class="page">
-    <div class="pad">
-      <div class="backbar reveal" style="--d:.02s">
-        <button class="iconbtn" onclick="go('diary')"><i class="fa-solid fa-arrow-left"></i></button>
-        <h1 class="h-page">직접 입력</h1>
-      </div>
-      <div class="card reveal" style="--d:.07s">
-        <label class="field-label">제목</label>
-        <input class="input" id="manual-title" type="text" placeholder="오늘의 작은 발견" autocomplete="off">
-        <label class="field-label" style="margin-top:14px">본문</label>
-        <textarea class="textarea" id="manual-body" placeholder="사진으로 일기를 찍으면 Clova OCR 인식 결과가 여기에 채워져요. 확인·수정 후 저장하세요." autocomplete="off"></textarea>
-        <p class="muted" style="font-size:11px;font-weight:600;margin-top:8px;line-height:1.5">
-          <i class="fa-solid fa-camera"></i> 기록 탭에서 촬영·보관함으로 사진을 넣을 수 있어요.
-        </p>
-        <label class="field-label" style="margin-top:14px">감정</label>
-        <div class="emo-pick" id="manual-mood"></div>
-      </div>
-      <button class="btn btn-primary reveal" style="--d:.12s;margin-top:16px" onclick="saveManualDiary()">
-        <i class="fa-solid fa-bookmark"></i> 직접 입력 저장하기
-      </button>
     </div>
   </div>
 
   <!-- ============ PASSWORD ============ -->
   <div id="page-password" class="page">
-    <div class="pad">
+    <div class="page-body">
       <div class="backbar reveal" style="--d:.02s">
-        <button class="iconbtn" onclick="go('settings')"><i class="fa-solid fa-arrow-left"></i></button>
-        <h1 class="h-page">비밀번호 변경</h1>
+        <button type="button" class="iconbtn" data-go="settings" aria-label="마이페이지로 돌아가기"><svg class="icon" aria-hidden="true"><use href="#i-back"/></svg></button>
+        <span>마이페이지</span>
       </div>
-      <div class="card reveal" style="--d:.07s">
-        <label class="field-label">현재 비밀번호</label>
-        <input class="input" id="password-current" type="password" placeholder="현재 비밀번호">
-        <label class="field-label" style="margin-top:14px">새 비밀번호</label>
-        <input class="input" id="password-next" type="password" placeholder="8자 이상">
-        <label class="field-label" style="margin-top:14px">새 비밀번호 확인</label>
-        <input class="input" id="password-next-confirm" type="password" placeholder="한 번 더 입력">
+      <div class="title-row compact reveal" style="--d:.04s"><div><p class="eyebrow">계정 보안</p><h2>비밀번호 변경</h2></div></div>
+      <div class="card writing-card reveal" style="--d:.07s">
+        <label>현재 비밀번호<input id="password-current" type="password" placeholder="현재 비밀번호" autocomplete="current-password"></label>
+        <label>새 비밀번호<input id="password-next" type="password" placeholder="8자 이상" autocomplete="new-password"></label>
+        <label>새 비밀번호 확인<input id="password-next-confirm" type="password" placeholder="한 번 더 입력" autocomplete="new-password"></label>
       </div>
-      <button class="btn btn-primary reveal" style="--d:.12s;margin-top:16px" onclick="changePassword()">
-        <i class="fa-solid fa-key"></i> 변경하기
+      <button type="button" class="btn btn-primary btn-block reveal" style="--d:.12s" id="password-submit">
+        <svg class="icon" aria-hidden="true"><use href="#i-key"/></svg>변경하기
       </button>
     </div>
   </div>
 
   <!-- ============ BACKUP ============ -->
   <div id="page-backup" class="page">
-    <div class="pad">
+    <div class="page-body">
       <div class="backbar reveal" style="--d:.02s">
-        <button class="iconbtn" onclick="go('settings')"><i class="fa-solid fa-arrow-left"></i></button>
-        <h1 class="h-page">백업 · 내보내기</h1>
+        <button type="button" class="iconbtn" data-go="settings" aria-label="마이페이지로 돌아가기"><svg class="icon" aria-hidden="true"><use href="#i-back"/></svg></button>
+        <span>마이페이지</span>
       </div>
-      <div class="card reveal" style="--d:.07s">
-        <div class="advice-row">
-          <div class="advice-ic" style="background:var(--accent-soft);color:var(--accent)"><i class="fa-solid fa-mobile-screen"></i></div>
-          <div style="flex:1">
-            <div style="font-size:14px;font-weight:800">로컬 보관</div>
-            <div class="muted" id="backup-local-desc" style="font-size:12px;font-weight:600">일기 0편 · 이 기기에 저장됨</div>
-          </div>
-          <span class="list-val">정상</span>
+      <div class="title-row compact reveal" style="--d:.04s"><div><p class="eyebrow">나의 기록 보관</p><h2>백업 · 내보내기</h2></div></div>
+      <div class="list reveal" style="--d:.07s">
+        <div class="list-item setting-row">
+          <i aria-hidden="true"><svg class="icon"><use href="#i-notebook"/></svg></i>
+          <span class="lead"><b>기록 보관 상태</b><small id="backup-local-desc">일기 0편 · 이 기기에 저장됨</small></span>
+          <span class="neutral-pill">정상</span>
         </div>
-        <div class="advice-row">
-          <div class="advice-ic" style="background:#E2EBE0;color:#5C7A56"><i class="fa-solid fa-file-export"></i></div>
-          <div style="flex:1">
-            <div style="font-size:14px;font-weight:800">JSON 내보내기</div>
-            <div class="muted" style="font-size:12px;font-weight:600">서버 전송 없이 파일로 저장</div>
-          </div>
+        <div class="list-item setting-row">
+          <i aria-hidden="true"><svg class="icon"><use href="#i-download"/></svg></i>
+          <span class="lead"><b>JSON 내보내기</b><small>서버 전송 없이 파일로 저장해요</small></span>
         </div>
       </div>
-      <button class="btn btn-primary reveal" style="--d:.12s;margin-top:16px" onclick="exportDiaries()">
-        <i class="fa-solid fa-download"></i> 일기 내보내기
+      <button type="button" class="btn btn-primary btn-block reveal" style="--d:.12s" id="backup-export-btn">
+        <svg class="icon" aria-hidden="true"><use href="#i-download"/></svg>일기 내보내기
       </button>
     </div>
   </div>
 
   <!-- ============ LOGIN ============ -->
   <div id="page-login" class="page">
-    <div class="pad auth-pad">
+    <div class="page-body auth-pad">
       <div class="auth-hero reveal" style="--d:.02s">
-        <div class="auth-logo"><i class="fa-solid fa-feather-pointed"></i></div>
-        <div class="brand" style="justify-content:center;margin-bottom:0">
-          <span class="brand-name">HANDAM · 한담</span>
-        </div>
-        <h1 class="h-page" style="margin-top:12px">다시 한담을<br>시작해볼까요?</h1>
-        <p class="muted" style="font-size:13px;font-weight:700;margin-top:8px">마음을 담는 하루의 기록</p>
+        <div class="auth-logo" aria-hidden="true">ㅎ</div>
+        <p class="eyebrow">HANDAM · 한담</p>
+        <h1 class="h-page">다시 한담을<br>시작해볼까요?</h1>
+        <p class="muted">마음을 담는 하루의 기록</p>
       </div>
       <form class="card reveal auth-card" id="login-form" style="--d:.07s" novalidate>
         <div class="auth-field">
@@ -535,11 +692,11 @@
           <p class="field-error" id="login-password-error" role="alert" hidden></p>
         </div>
         <p class="form-error" id="login-form-error" role="alert" hidden></p>
-        <button type="submit" class="btn btn-primary auth-submit">
+        <button type="submit" class="btn btn-primary btn-block auth-submit">
           <i class="fa-solid fa-right-to-bracket" aria-hidden="true"></i><span data-button-label>로그인</span>
         </button>
       </form>
-      <button type="button" class="btn btn-line reveal auth-provider" id="google-login-button" style="--d:.14s" data-auth-action="google-login">
+      <button type="button" class="btn btn-line btn-block reveal auth-provider" id="google-login-button" style="--d:.14s" data-auth-action="google-login">
         <i class="fa-brands fa-google" aria-hidden="true"></i><span data-button-label>Google로 로그인</span>
       </button>
       <div class="auth-links reveal" style="--d:.16s">
@@ -552,9 +709,9 @@
 
   <!-- ============ SIGNUP ============ -->
   <div id="page-signup" class="page">
-    <div class="pad auth-pad">
+    <div class="page-body auth-pad">
       <div class="backbar reveal" style="--d:.02s">
-        <button type="button" class="iconbtn" data-auth-go="login" aria-label="로그인으로 돌아가기"><i class="fa-solid fa-arrow-left" aria-hidden="true"></i></button>
+        <button type="button" class="iconbtn" data-auth-go="login" aria-label="로그인으로 돌아가기"><svg class="icon" aria-hidden="true"><use href="#i-back"/></svg></button>
         <h1 class="h-page" tabindex="-1">회원가입</h1>
       </div>
       <p class="muted reveal auth-intro" style="--d:.05s">
@@ -593,7 +750,7 @@
           <p class="field-error" id="signup-password-confirm-error" role="alert" hidden></p>
         </div>
         <p class="form-error" id="signup-form-error" role="alert" hidden></p>
-        <button type="submit" class="btn btn-primary auth-submit">
+        <button type="submit" class="btn btn-primary btn-block auth-submit">
           <i class="fa-solid fa-user-plus" aria-hidden="true"></i><span data-button-label>가입하기</span>
         </button>
       </form>
@@ -605,9 +762,9 @@
 
   <!-- ============ FIND ACCOUNT ============ -->
   <div id="page-find-account" class="page">
-    <div class="pad auth-pad">
+    <div class="page-body auth-pad">
       <div class="backbar reveal" style="--d:.02s">
-        <button type="button" class="iconbtn" data-auth-go="login" aria-label="로그인으로 돌아가기"><i class="fa-solid fa-arrow-left" aria-hidden="true"></i></button>
+        <button type="button" class="iconbtn" data-auth-go="login" aria-label="로그인으로 돌아가기"><svg class="icon" aria-hidden="true"><use href="#i-back"/></svg></button>
         <h1 class="h-page" tabindex="-1">계정 찾기</h1>
       </div>
       <div class="seg reveal auth-tabs" style="--d:.06s" id="find-tabs" role="tablist" aria-label="계정 찾기 방식">
@@ -625,7 +782,7 @@
             </div>
           </div>
           <p class="form-error" id="password-reset-form-error" role="alert" hidden></p>
-          <button type="submit" class="btn btn-primary auth-panel-submit" id="password-reset-submit">
+          <button type="submit" class="btn btn-primary btn-block auth-panel-submit" id="password-reset-submit">
             <i class="fa-solid fa-envelope" aria-hidden="true"></i><span data-button-label>재설정 메일 보내기</span>
           </button>
           <div id="find-reset-result" class="find-hint" role="status" aria-live="polite" aria-atomic="true" hidden></div>
@@ -638,7 +795,7 @@
             로그인할 때 저장한 마스킹 정보만 보여드려요. 이메일 원문과 인증 토큰은 저장하지 않습니다.
           </p>
         </div>
-        <button type="button" class="btn btn-primary auth-panel-submit" data-auth-action="show-account-hints">
+        <button type="button" class="btn btn-primary btn-block auth-panel-submit" data-auth-action="show-account-hints">
           <i class="fa-solid fa-clock-rotate-left" aria-hidden="true"></i><span>최근 계정 보기</span>
         </button>
         <div id="find-id-result" class="find-hint" role="status" aria-live="polite" aria-atomic="true" hidden></div>
@@ -653,19 +810,21 @@
   </div>
 
   <!-- Bottom nav -->
-  <nav class="bottom-nav" aria-label="주요 메뉴">
-    <button type="button" class="nav-item active" data-page="home" aria-current="page" onclick="go('home')">
-      <i class="fa-solid fa-house" aria-hidden="true"></i><span>홈</span>
+  <nav class="bottom-nav mobile-nav" aria-label="주요 메뉴">
+    <button type="button" class="nav-item active" data-page="home" aria-current="page">
+      <svg class="icon" aria-hidden="true"><use href="#i-home"/></svg><span>홈</span>
     </button>
-    <button type="button" class="nav-item" data-page="fortune" onclick="go('fortune')">
-      <i class="fa-solid fa-sun" aria-hidden="true"></i><span>운세</span>
+    <button type="button" class="nav-item" data-page="records">
+      <svg class="icon" aria-hidden="true"><use href="#i-notebook"/></svg><span>나의 기록</span>
     </button>
-    <button type="button" class="fab" aria-label="새 일기 작성" onclick="go('diary')"><i class="fa-solid fa-feather-pointed" aria-hidden="true"></i><span class="fab-label" aria-hidden="true">기록</span></button>
-    <button type="button" class="nav-item" data-page="prompts" onclick="go('prompts')">
-      <i class="fa-solid fa-lightbulb" aria-hidden="true"></i><span>글감</span>
+    <button type="button" class="nav-item" data-page="analysis">
+      <svg class="icon" aria-hidden="true"><use href="#i-chart"/></svg><span>분석</span>
     </button>
-    <button type="button" class="nav-item" data-page="settings" onclick="go('settings')">
-      <i class="fa-solid fa-gear" aria-hidden="true"></i><span>설정</span>
+    <button type="button" class="nav-item" data-page="report">
+      <svg class="icon" aria-hidden="true"><use href="#i-report"/></svg><span>회고</span>
+    </button>
+    <button type="button" class="nav-item" data-page="settings">
+      <svg class="icon" aria-hidden="true"><use href="#i-user"/></svg><span>마이페이지</span>
     </button>
   </nav>
 
@@ -673,20 +832,18 @@
   <div class="scrim" id="scrim" data-sheet-dismiss aria-hidden="true"></div>
   <div class="sheet" id="sheet" role="dialog" aria-modal="true" aria-labelledby="sheet-title" aria-hidden="true" inert>
     <div class="grabber"></div>
-    <h2 id="sheet-title" style="font-size:18px;font-weight:800">생년월일 입력</h2>
-    <p class="muted" style="font-size:13px;font-weight:600;margin-top:6px">
-      생년월일과 별자리로 오늘의 운세 점수를 계산해요.
-    </p>
-    <div style="display:flex;gap:9px;margin-top:18px">
-      <select class="field" id="fortune-year"></select>
-      <select class="field" id="fortune-month"></select>
-      <select class="field" id="fortune-day"></select>
+    <h2 id="sheet-title">생년월일 입력</h2>
+    <p class="muted sheet-copy">생년월일과 별자리로 오늘의 운세를 계산해요.</p>
+    <div class="sheet-selects">
+      <select class="field" id="fortune-year" aria-label="태어난 해"></select>
+      <select class="field" id="fortune-month" aria-label="태어난 달"></select>
+      <select class="field" id="fortune-day" aria-label="태어난 날"></select>
     </div>
-    <div class="list-item" style="border:1px solid var(--border);border-radius:14px;margin-top:11px;padding:13px 16px">
-      <div class="lead" style="font-size:13px"><i class="fa-solid fa-moon"></i> 음력으로 입력</div>
-      <div class="switch" id="fortune-lunar-switch" data-setting="lunarCalendar" onclick="toggleSwitch(event, this, '음력 입력 설정을 바꿨어요')"></div>
+    <div class="list-item sheet-switch-row">
+      <div class="lead"><svg class="icon" aria-hidden="true"><use href="#i-moon"/></svg> 음력으로 입력</div>
+      <div class="switch" id="fortune-lunar-switch" data-setting="lunarCalendar" role="switch" aria-checked="false" aria-label="음력으로 입력" tabindex="0"><u></u></div>
     </div>
-    <button class="btn btn-primary" style="margin-top:16px" onclick="updateFortuneFromBirthday()">운세 계산하기</button>
+    <button type="button" class="btn btn-primary btn-block" id="fortune-calc-btn">운세 계산하기</button>
   </div>
 
   <!-- Bottom sheet: weekly mood statistics -->
@@ -700,18 +857,18 @@
         <p class="muted" id="week-stats-range">이번 주</p>
       </div>
       <button class="week-sheet-close" id="week-stats-close" type="button" aria-label="주간 마음 통계 닫기">
-        <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+        <svg class="icon" aria-hidden="true"><use href="#i-x"/></svg>
       </button>
     </div>
     <div class="week-range-nav" aria-label="주간 이동">
-      <button id="week-stats-prev" type="button" aria-label="이전 주 보기"><i class="fa-solid fa-chevron-left" aria-hidden="true"></i></button>
+      <button id="week-stats-prev" type="button" aria-label="이전 주 보기"><svg class="icon" aria-hidden="true"><use href="#i-back"/></svg></button>
       <span id="week-stats-range-compact">이번 주</span>
-      <button id="week-stats-next" type="button" aria-label="다음 주 보기"><i class="fa-solid fa-chevron-right" aria-hidden="true"></i></button>
+      <button id="week-stats-next" type="button" aria-label="다음 주 보기"><svg class="icon" aria-hidden="true"><use href="#i-chevron"/></svg></button>
     </div>
     <div class="week-stats-days" id="week-stats-days"></div>
     <div id="week-stats-content">
       <div class="week-stats-insight">
-        <i class="fa-solid fa-seedling" aria-hidden="true"></i>
+        <svg class="icon" aria-hidden="true"><use href="#i-leaf"/></svg>
         <div><strong id="week-stats-insight-title">마음 기록을 기다리고 있어요</strong><p id="week-stats-insight-copy">이번 주의 첫 마음을 남겨보세요.</p></div>
       </div>
       <div class="week-stats-metrics">
@@ -722,7 +879,7 @@
       <div class="mood-distribution-legend week-stats-legend" id="week-stats-distribution-legend"></div>
     </div>
     <div class="week-stats-empty" id="week-stats-empty" hidden>
-      <i class="fa-regular fa-face-smile" aria-hidden="true"></i>
+      <svg class="icon" aria-hidden="true"><use href="#i-leaf"/></svg>
       <strong>이 주에는 아직 마음 기록이 없어요</strong>
       <p>작은 한 줄도 한 주를 돌아보는 시작이 돼요.</p>
     </div>
@@ -740,4 +897,3 @@
 <script type="module" src="./app.js"></script>
 </body>
 </html>
-

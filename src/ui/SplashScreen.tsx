@@ -123,7 +123,7 @@ export default function SplashScreen({ onDone, splashConfig }: SplashScreenProps
         >
           <div className="splash-aurora">
             <Aurora
-              colorStops={["#E8A85C", "#C66A38", "#8B4A2E"]}
+              colorStops={["#BDCDBF", "#5F7C66", "#E9DDC7"]}
               amplitude={cfg.aurora.amplitude}
               blend={cfg.aurora.blend}
               speed={cfg.aurora.speed}
@@ -137,7 +137,7 @@ export default function SplashScreen({ onDone, splashConfig }: SplashScreenProps
               animate={{ scale: 1, opacity: 1, rotate: 0 }}
               transition={{ duration: cfg.markDurationS, ease: [0.22, 1, 0.36, 1] }}
             >
-              <i className="fa-solid fa-feather-pointed" />
+              <span className="splash-mark-glyph">ㅎ</span>
             </motion.div>
             <div className="splash-title" role="heading" aria-level={1}>
               <BlurText

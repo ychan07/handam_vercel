@@ -74,6 +74,11 @@ const state = {
   recordDetailReturnPage: "records",
   settings: null,
   recordsSource: "none",
+  trackerMonth: null,
+  reportMode: "month",
+  reportKey: "",
+  ocrFile: null,
+  fortuneOpened: false,
 };
 const googleProvider = new GoogleAuthProvider();
 const AUTH_PAGES = new Set(["login", "signup", "find-account", "admin"]);
@@ -220,6 +225,7 @@ function applyUserSettings(settings, { applyFortune = true } = {}) {
   state.settings = next;
   applyTheme(next.theme, { save: false });
   document.getElementById("fortune-lunar-switch")?.classList.toggle("on", next.lunarCalendar);
+  document.getElementById("fortune-lunar-switch")?.setAttribute("aria-checked", String(next.lunarCalendar));
   document.querySelectorAll("[data-setting-segment]").forEach((segment) => {
     const key = segment.dataset.settingSegment;
     segment.querySelectorAll("button").forEach((button) => {
@@ -237,6 +243,7 @@ function applyUserSettings(settings, { applyFortune = true } = {}) {
   if (applyFortune) {
     state.fortuneBirthday = next.fortuneBirthday || null;
     refreshFortune();
+    syncFortuneOpenedState();
     renderFortuneUI();
     fillBirthdaySelects();
   }
@@ -433,31 +440,7 @@ function getGreetingIconClass(slot = getGreetingSlot()) {
 function renderHomeGreeting() {
   const root = document.getElementById("home-greeting");
   if (!root) return;
-  const name = getDisplayName();
-  const greeting = getGreeting();
-  const iconClass = getGreetingIconClass();
-
-  root.replaceChildren();
-
-  const line = document.createElement("span");
-  line.className = "home-greeting-line";
-  line.textContent = `${greeting},`;
-  root.append(line, document.createElement("br"));
-
-  const nameSpan = document.createElement("span");
-  nameSpan.className = "home-greeting-name";
-  nameSpan.textContent = name;
-  root.appendChild(nameSpan);
-
-  const tail = document.createElement("span");
-  tail.className = "home-greeting-tail";
-  tail.append("님 ");
-
-  const icon = document.createElement("i");
-  icon.className = `fa-solid fa-${iconClass} home-greeting-icon`;
-  icon.setAttribute("aria-hidden", "true");
-  tail.appendChild(icon);
-  root.appendChild(tail);
+  root.textContent = `${getGreeting()}, ${getDisplayName()}님`;
 }
 function buildPromptByMoodFromJson(json) {
   const map = {};
@@ -532,20 +515,13 @@ function diaryEntryDate(reference = new Date()) {
 }
 function renderEmotionPickers() {
   if (!emotionOptions.length) return;
-  const html = emotionOptions
-    .map(
-      (e, index) =>
-        `<div class="emo-opt${index === 0 ? " sel" : ""}" data-mood="${escapeHtml(e.id)}">${e.emoji} ${escapeHtml(e.label)}</div>`
-    )
+  const select = document.getElementById("manual-mood");
+  if (!select) return;
+  const current = select.value;
+  select.innerHTML = emotionOptions
+    .map((e) => `<option value="${escapeHtml(e.id)}">${e.emoji} ${escapeHtml(e.label)}</option>`)
     .join("");
-  for (const selector of ["#manual-mood"]) {
-    const container = document.querySelector(selector);
-    if (!container) continue;
-    container.innerHTML = html;
-    delete container.dataset.moodBound;
-    bindMoodPicker(selector);
-  }
-  refreshInteractions();
+  if ([...select.options].some((o) => o.value === current)) select.value = current;
 }
 function renderMoodFilter() {
   const select = document.getElementById("filter-mood");
@@ -605,10 +581,9 @@ async function loadAppData() {
     renderMoodFilter();
   }
 }
-function formatTodayLabel() {
-  const now = new Date();
-  const weekdays = ["일", "월", "화", "수", "목", "금", "토"];
-  return `${now.getMonth() + 1}월 ${now.getDate()}일 ${weekdays[now.getDay()]}요일`;
+const WEEKDAY_LABELS = ["일", "월", "화", "수", "목", "금", "토"];
+function formatTodayLabel(now = new Date()) {
+  return `${now.getFullYear()}년 ${now.getMonth() + 1}월 ${now.getDate()}일, ${WEEKDAY_LABELS[now.getDay()]}요일`;
 }
 function toDateKey(date) {
   const y = date.getFullYear();
@@ -629,6 +604,16 @@ const MOOD_COLORS = Object.freeze({
   행복: "#E9B958", 평온: "#94A873", 설렘: "#DF907C", 차분: "#82A8A0", 지침: "#A99B8D",
   감사: "#CDA66B", 슬픔: "#7694B3", 분노: "#CE6E57", 불안: "#B18AB7", 자신: "#D18B49",
 });
+function moodColor(mood) {
+  return MOOD_COLORS[parseMoodLabel(mood)] || "#9DB09F";
+}
+function moodTint(mood) {
+  return `${moodColor(mood)}2E`;
+}
+function emotionBadgeHtml(mood) {
+  const label = parseMoodLabel(mood) || "기록";
+  return `<span class="emotion-badge ${getEmotionChipClass(mood)}"><b aria-hidden="true">${moodToEmoji(mood)}</b>${escapeHtml(label)}</span>`;
+}
 const MOOD_ADJECTIVES = Object.freeze({
   행복: "행복한", 평온: "평온한", 설렘: "설레는", 차분: "차분한", 지침: "지친", 감사: "감사한",
   슬픔: "슬픈", 분노: "화난", 불안: "불안한", 자신: "자신감 있는",
@@ -736,18 +721,19 @@ function updateHomeWeekDiary() {
     dot.classList.remove("dot-add");
     dot.removeAttribute("title");
     dayEl.classList.remove("day-add");
+    dot.classList.remove("has-mood");
+    dot.style.removeProperty("--mood-tint");
     if (record) {
       dot.textContent = moodToEmoji(record.mood);
-      dot.style.opacity = "1";
+      dot.classList.add("has-mood");
+      dot.style.setProperty("--mood-tint", moodTint(record.mood));
     } else if (isToday) {
       dot.textContent = "＋";
-      dot.style.opacity = "1";
       dot.classList.add("dot-add");
       dayEl.classList.add("day-add");
       dot.title = "오늘 일기 쓰기";
     } else {
-      dot.textContent = "";
-      dot.style.opacity = "0.35";
+      dot.textContent = String(date.getDate());
     }
   });
   const weekKeys = new Set(weekDates.map(toDateKey));
@@ -900,28 +886,76 @@ function updateBackupStats() {
   const location = state.recordsSource === "firestore" ? "계정에 동기화됨" : "이 기기 캐시에 저장됨";
   el.textContent = `일기 ${count}편 · ${location}`;
 }
+function updateMypageStats() {
+  const el = (id) => document.getElementById(id);
+  const keys = state.records.map(recordDateKey).filter(Boolean);
+  const months = new Set(keys.map((key) => key.slice(0, 7)));
+  if (el("mypage-total")) el("mypage-total").textContent = String(state.records.length);
+  if (el("mypage-months")) el("mypage-months").textContent = String(months.size);
+  if (el("mypage-streak")) el("mypage-streak").textContent = `${computeWritingStreak(state.records)}일`;
+}
 function updateDiaryStatsUI() {
   updateHomeWeekDiary();
   updateBackupStats();
+  updateMypageStats();
 }
 function updateUserUI() {
   const name = getDisplayName();
   const el = (id) => document.getElementById(id);
   renderHomeGreeting();
   if (el("home-date")) el("home-date").textContent = formatTodayLabel();
+  if (el("fortune-date")) el("fortune-date").textContent = `${formatTodayLabel()} · 오늘의 기운`;
   if (el("settings-display-name")) el("settings-display-name").textContent = name;
   if (el("settings-email")) el("settings-email").textContent = state.auth?.email || state.profile?.email || "로그인이 필요해요";
   if (el("settings-avatar")) el("settings-avatar").textContent = name.slice(0, 1);
-  if (el("diary-date-label")) el("diary-date-label").textContent = formatTodayLabel();
+  if (el("header-avatar")) el("header-avatar").textContent = name.slice(0, 1);
   updateDiaryStatsUI();
 }
-function openManualDiary() {
+
+/* ---------- Writer (records page editor) ---------- */
+function setEditorOpen(open) {
+  const editor = document.getElementById("diary-editor");
+  const toggle = document.getElementById("writer-toggle");
+  if (!editor || !toggle) return;
+  editor.hidden = !open;
+  toggle.setAttribute("aria-expanded", String(open));
+  toggle.innerHTML = open
+    ? '<svg class="icon" aria-hidden="true"><use href="#i-x"/></svg><span>작성 닫기</span>'
+    : '<svg class="icon" aria-hidden="true"><use href="#i-plus"/></svg><span>새로운 기록</span>';
+  if (open) {
+    const date = document.getElementById("manual-date");
+    if (date) {
+      date.max = diaryEntryDate();
+      if (!date.value) date.value = diaryEntryDate();
+    }
+  }
+}
+function resetWriterForm() {
   const title = document.getElementById("manual-title");
   const body = document.getElementById("manual-body");
+  const date = document.getElementById("manual-date");
+  const mood = document.getElementById("manual-mood");
   if (title) title.value = "";
   if (body) body.value = "";
+  if (date) date.value = diaryEntryDate();
+  if (mood && mood.options.length) mood.selectedIndex = 0;
   state.selectedPrompt = "";
-  go("manual");
+  clearOcrSelection();
+}
+function openWriter({ reset = false, focus = "title" } = {}) {
+  if (reset) resetWriterForm();
+  if (currentPageId() !== "records") go("records");
+  setEditorOpen(true);
+  requestAnimationFrame(() => {
+    const editor = document.getElementById("diary-editor");
+    const page = document.getElementById("page-records");
+    if (editor && page) page.scrollTo({ top: Math.max(0, editor.offsetTop - 12), behavior: "smooth" });
+    const target = document.getElementById(focus === "body" ? "manual-body" : "manual-title");
+    target?.focus({ preventScroll: true });
+  });
+}
+function openManualDiary() {
+  openWriter({ reset: true });
 }
 function buildDiaryCorpus(records) {
   return records.map((r) => `${r.title} ${r.body} ${r.summary || ""} ${r.mood}`).join(" ").toLowerCase();
@@ -1107,6 +1141,25 @@ function replayRevealAnimations(pageEl) {
   });
 }
 
+const PAGE_TITLES = Object.freeze({
+  home: "오늘의 한담",
+  records: "나의 기록",
+  "record-detail": "기록 상세",
+  analysis: "감정 분석",
+  report: "회고 리포트",
+  settings: "마이페이지",
+  fortune: "오늘의 운세",
+  prompts: "오늘의 질문",
+  password: "비밀번호 변경",
+  backup: "백업 · 내보내기",
+});
+const NAV_PARENT = Object.freeze({
+  "record-detail": "records",
+  fortune: "home",
+  prompts: "home",
+  password: "settings",
+  backup: "settings",
+});
 function go(id) {
   if (id === "admin") {
     if (!state.admin?.token) return go("login");
@@ -1122,6 +1175,10 @@ function go(id) {
     else window.handamAdminPending = options;
     return;
   }
+  if (id === "diary" || id === "manual") {
+    openWriter({ reset: id === "diary" });
+    return;
+  }
   if (document.getElementById("week-stats-sheet")?.classList.contains("show")) {
     closeWeekStatsSheet({ restoreFocus: false });
   }
@@ -1130,30 +1187,35 @@ function go(id) {
   const target = document.getElementById("page-" + id);
   if (!target) return;
   if (AUTH_PAGES.has(id)) closeSheet({ restoreFocus: false });
+  const previous = currentPageId();
   document.querySelectorAll(".page").forEach((p) => p.classList.toggle("active", p === target));
+  const navPage = NAV_PARENT[id] || id;
   document.querySelectorAll(".nav-item").forEach((n) => {
-    const active = n.dataset.page === (id === "records" ? "home" : id);
+    const active = n.dataset.page === navPage;
     n.classList.toggle("active", active);
     if (active) n.setAttribute("aria-current", "page");
     else n.removeAttribute("aria-current");
   });
   document.querySelector(".device")?.classList.toggle("auth-mode", AUTH_PAGES.has(id));
+  const header = document.getElementById("app-header");
+  if (header) header.classList.toggle("is-subpage", id !== "home");
+  const headerTitle = document.getElementById("header-title");
+  if (headerTitle) headerTitle.textContent = PAGE_TITLES[id] || "한담";
   const device = document.querySelector(".device");
   if (device) device.scrollTop = 0;
-  target.scrollTop = 0;
+  if (previous !== id) target.scrollTop = 0;
   replayRevealAnimations(target);
-  if (id === "diary") resetOCR();
   if (id === "fortune") {
     if (fortuneData && state.fortuneBirthday) refreshFortune();
+    syncFortuneOpenedState();
     renderFortuneUI();
-    const fortuneAnim = getAnimations().fortune || {};
-    setTimeout(animateGauge, fortuneAnim.gaugeDelayMs ?? 160);
-    if (!state.fortuneBirthday) setTimeout(openSheet, fortuneAnim.sheetOpenDelayMs ?? 280);
   }
   if (id === "records") {
-    renderRecordsStats();
+    if (previous !== "records" && previous !== "record-detail") setEditorOpen(false);
     renderRecordsPage();
   }
+  if (id === "analysis") renderAnalysis();
+  if (id === "report") renderReport();
   if (id === "prompts") renderPromptRecommendations();
   if (id === "home" || id === "settings") {
     updateUserUI();
@@ -1230,24 +1292,18 @@ function closeSheet({ restoreFocus = true } = {}) {
   sheetReturnFocus = null;
 }
 function animateGauge() {
-  const ring = document.getElementById("gauge-ring");
   const num = document.getElementById("gauge-num");
-  if (!ring || !num) return;
-  const C = 515.2;
+  if (!num) return;
   if (window._gauge) cancelAnimationFrame(window._gauge);
   if (!state.fortune) {
-    ring.style.transition = "none";
-    ring.style.strokeDashoffset = C;
     num.textContent = "—";
     return;
   }
   const target = state.fortune.total;
-  ring.style.transition = "none";
-  ring.style.strokeDashoffset = C;
-  ring.getBoundingClientRect();
-  const ringDur = getAnimations().fortune?.gaugeRingTransitionS ?? 1.55;
-  ring.style.transition = `stroke-dashoffset ${ringDur}s cubic-bezier(.22,1,.36,1)`;
-  ring.style.strokeDashoffset = C * (1 - target / 100);
+  if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+    num.textContent = String(target);
+    return;
+  }
   let v = 0;
   const tick = () => {
     const remaining = target - v;
@@ -1268,21 +1324,9 @@ function setOcrStep(step) {
   if (upload) upload.style.display = step === "loading" ? "none" : "block";
   if (loading) loading.style.display = step === "loading" ? "block" : "none";
 }
-function bindMoodPicker(selector) {
-  const container = document.querySelector(selector);
-  if (!container || container.dataset.moodBound === "1") return;
-  container.dataset.moodBound = "1";
-  container.addEventListener("click", (e) => {
-    const option = e.target.closest(".emo-opt");
-    if (!option) return;
-    container.querySelectorAll(".emo-opt").forEach((x) => x.classList.remove("sel"));
-    option.classList.add("sel");
-  });
-}
 function getSelectedMood(selector) {
-  const selected = document.querySelector(`${selector} .emo-opt.sel`);
-  if (selected?.dataset.mood) return selected.dataset.mood;
-  if (selected) return parseMoodLabel(selected.textContent);
+  const select = document.querySelector(selector);
+  if (select?.value) return select.value;
   return emotionOptions[0]?.id || "평온";
 }
 
@@ -1328,23 +1372,73 @@ async function runOCRFile(file) {
     if (!text) throw new Error("인식된 글자가 없어요. 밝은 곳에서 다시 촬영해 주세요.");
     resetOCR();
     fillManualFromOcr(text);
-    showToast("인식한 글을 직접 입력란에 넣었어요. 확인한 뒤 저장하세요.");
-    go("manual");
+    showToast("인식한 글을 기록란에 넣었어요. 확인한 뒤 저장하세요.");
+    openWriter({ focus: "body" });
   } catch (error) {
     showToast(error.message || "OCR 처리에 실패했어요.");
     resetOCR();
   }
 }
 
+function previewOcrFile(file) {
+  if (!file) return;
+  if (!file.type?.startsWith("image/")) {
+    showToast("이미지 파일만 선택할 수 있어요.");
+    return;
+  }
+  state.ocrFile = file;
+  const zone = document.getElementById("ocr-zone");
+  const img = document.getElementById("ocr-preview");
+  const run = document.getElementById("ocr-run-btn");
+  if (img) {
+    if (img.dataset.objectUrl) URL.revokeObjectURL(img.dataset.objectUrl);
+    const url = URL.createObjectURL(file);
+    img.dataset.objectUrl = url;
+    img.src = url;
+    img.alt = "선택한 다이어리 사진 미리보기";
+    img.hidden = false;
+  }
+  zone?.classList.add("has-image");
+  if (run) run.disabled = false;
+}
+function clearOcrSelection() {
+  state.ocrFile = null;
+  const img = document.getElementById("ocr-preview");
+  if (img) {
+    if (img.dataset.objectUrl) URL.revokeObjectURL(img.dataset.objectUrl);
+    delete img.dataset.objectUrl;
+    img.removeAttribute("src");
+    img.hidden = true;
+  }
+  document.getElementById("ocr-zone")?.classList.remove("has-image");
+  const run = document.getElementById("ocr-run-btn");
+  if (run) run.disabled = true;
+}
 function openCameraOCR() { const input = document.getElementById("ocr-camera-file"); input.value = ""; input.click(); }
 function openGalleryOCR() { const input = document.getElementById("ocr-gallery-file"); input.value = ""; input.click(); }
 function resetOCR() { setOcrStep("upload"); }
 
-async function saveManualDiary() {
+async function saveManualDiary(event) {
+  event?.preventDefault?.();
+  const saveButton = document.getElementById("manual-save-btn");
+  if (saveButton?.disabled) return;
   const title = document.getElementById("manual-title").value.trim() || "제목 없는 기록";
   const body = document.getElementById("manual-body").value.trim();
-  if (!body) return showToast("본문을 입력해주세요.");
+  if (!body) {
+    document.getElementById("manual-body")?.focus();
+    return showToast("기록 내용을 입력해주세요.");
+  }
+  const pickedDate = String(document.getElementById("manual-date")?.value || "");
+  const entryDate = /^\d{4}-\d{2}-\d{2}$/.test(pickedDate) && pickedDate <= diaryEntryDate() ? pickedDate : diaryEntryDate();
   const mood = formatMoodForSave(getSelectedMood("#manual-mood"));
+  setAuthButtonPending(saveButton, true, "AI가 기록을 정리하고 있어요…");
+  try {
+    await persistDiary({ title, body, mood, entryDate });
+  } finally {
+    setAuthButtonPending(saveButton, false);
+  }
+}
+async function persistDiary({ title, body, mood, entryDate }) {
   let summary = body;
   const settings = currentSettings();
   let aiModel = "";
@@ -1375,7 +1469,7 @@ async function saveManualDiary() {
         summaryQuality: settings.summaryQuality,
         summaryGenerated,
         createdAt: Timestamp.fromDate(now),
-        entryDate: diaryEntryDate(now),
+        entryDate,
         syncedAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       });
@@ -1386,12 +1480,14 @@ async function saveManualDiary() {
         mood,
         summary,
         createdAt: new Date().toISOString(),
-        entryDate: diaryEntryDate(),
+        entryDate,
       });
       persistSerialized(result);
     }
     await reloadRecords();
-    showToast("일기를 계정에 저장했어요.");
+    resetWriterForm();
+    setEditorOpen(false);
+    showToast(uid && !state.auth?.isAdmin ? "기록을 계정에 저장했어요." : "기록을 이 기기에 저장했어요.");
     go("records");
   } catch (error) {
     console.error("일기 저장 실패", error);
@@ -1410,10 +1506,10 @@ function renderPromptRecommendations() {
     card.dataset.mood = moodKey;
     const matchEl = card.querySelector(".match");
     if (score == null) {
-      matchEl.innerHTML = `<i class="fa-solid fa-bolt"></i> 일기 기록 후 분석`;
+      matchEl.textContent = "기록이 쌓이면 맞춤 추천돼요";
     } else {
       const moodLabel = moodKey === "default" ? "균형" : moodKey;
-      matchEl.innerHTML = `<i class="fa-solid fa-bolt"></i> ${moodLabel} 감정 ${score}%`;
+      matchEl.textContent = `${moodLabel} 감정과 ${score}% 어울려요`;
     }
     card.querySelector(".prompt-emoji").textContent = prompt.emoji;
     card.querySelector("h3").textContent = prompt.title;
@@ -1423,15 +1519,14 @@ function renderPromptRecommendations() {
   const metaHtml = formatPromptMeta(analysis);
   if (meta && meta.innerHTML !== metaHtml) meta.innerHTML = metaHtml;
   const homePrompt = document.getElementById("home-prompt-teaser");
-  if (homePrompt && picks[0]) {
-    const top = picks[0];
-    const score = calculatePromptScore(top.prompt, top.moodKey, analysis);
-    if (score == null) {
-      homePrompt.textContent = "오늘의 글감을 확인해보세요.";
-    } else {
-      homePrompt.textContent = `${getDisplayName()}님, "${top.prompt.title}" 글감이 지금 감정에 ${score}% 맞아요.`;
-    }
-  }
+  if (homePrompt && picks[0]) homePrompt.textContent = picks[0].prompt.title;
+}
+function selectPromptSlot(slot) {
+  document.querySelectorAll(".prompt-slot").forEach((card) => {
+    const selected = card === slot;
+    card.classList.toggle("selected", selected);
+    card.setAttribute("aria-checked", String(selected));
+  });
 }
 
 async function refreshPrompts() {
@@ -1444,46 +1539,223 @@ async function refreshPrompts() {
   showToast("새 글감을 골랐어요");
 }
 function startPromptDiary(card) {
-  const title = card.querySelector("h3").textContent;
+  const title = (card?.querySelector?.("h3")?.textContent || String(card || "")).trim();
+  if (!title) return;
+  resetWriterForm();
   state.selectedPrompt = title;
   document.getElementById("manual-title").value = title;
-  document.getElementById("manual-body").value = "";
-  showToast(`글감 "${title}"으로 직접 입력 화면을 열었어요.`);
-  go("manual");
+  showToast(`“${title}” 질문으로 기록을 시작해요.`);
+  openWriter({ focus: "body" });
 }
 
+/* ---------- Records list / home cards ---------- */
+function dateFromKey(key) {
+  const [y, m, d] = String(key || "").split("-").map(Number);
+  if (!y || !m || !d) return null;
+  return new Date(y, m - 1, d, 12);
+}
+function formatEntryDate(record) {
+  const date = dateFromKey(recordDateKey(record)) || new Date(record.createdAt);
+  if (Number.isNaN(date.getTime())) return "";
+  return `${date.getMonth() + 1}월 ${date.getDate()}일 (${WEEKDAY_LABELS[date.getDay()]})`;
+}
+function openRecordDetail(record, returnPage = "records") {
+  state.selectedRecordId = record.id;
+  state.recordDetailReturnPage = returnPage;
+  document.getElementById("record-title").textContent = record.title;
+  document.getElementById("record-date").textContent = formatEntryDate(record);
+  const moodEl = document.getElementById("record-mood");
+  moodEl.className = `emotion-badge ${getEmotionChipClass(record.mood)}`;
+  moodEl.innerHTML = `<b aria-hidden="true">${moodToEmoji(record.mood)}</b>${escapeHtml(parseMoodLabel(record.mood) || "기록")}`;
+  document.getElementById("record-body").textContent = record.body;
+  document.getElementById("record-summary").textContent = `“${record.summary || record.body.slice(0, 60)}”`;
+  go("record-detail");
+}
+function bindActivate(element, handler) {
+  element.addEventListener("click", handler);
+  element.addEventListener("keydown", (event) => {
+    if (event.target !== element || (event.key !== "Enter" && event.key !== " ")) return;
+    event.preventDefault();
+    handler(event);
+  });
+}
 function createRecordRow(record, returnPage = "records") {
-  const row = document.createElement("div");
-  row.className = "diary-row tap";
-  const chipClass = getEmotionChipClass(record.mood);
-  row.innerHTML = `<div class="diary-thumb"><i class="fa-solid fa-pen-nib"></i></div><div style="flex:1;min-width:0"><div style="font-size:14px;font-weight:800">${escapeHtml(record.title)}</div><div class="muted" style="font-size:12px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${formatDate(record.createdAt)} · ${escapeHtml(record.body)}</div></div><span class="chip ${chipClass}">${escapeHtml(record.mood)}</span>`;
-  row.addEventListener("click", () => {
-    state.selectedRecordId = record.id;
-    state.recordDetailReturnPage = returnPage;
-    document.getElementById("record-title").textContent = record.title;
-    document.getElementById("record-date").textContent = formatDate(record.createdAt);
-    const moodEl = document.getElementById("record-mood");
-    moodEl.textContent = record.mood;
-    moodEl.className = `chip ${getEmotionChipClass(record.mood)}`;
-    document.getElementById("record-body").textContent = record.body;
-    document.getElementById("record-summary").textContent = `“${record.summary || record.body.slice(0, 60)}”`;
-    go("record-detail");
+  const row = document.createElement("article");
+  row.className = "card archive-item diary-row tap";
+  row.tabIndex = 0;
+  row.setAttribute("role", "button");
+  row.setAttribute("aria-label", `${record.title} 기록 열기`);
+  const summary = record.summary && record.summary !== record.body
+    ? `<p class="archive-summary"><svg class="icon" aria-hidden="true"><use href="#i-sparkles"/></svg><span>${escapeHtml(record.summary)}</span></p>`
+    : "";
+  row.innerHTML = `<div class="archive-content">
+      <div>${emotionBadgeHtml(record.mood)}<span>${escapeHtml(formatEntryDate(record))}</span></div>
+      <h4>${escapeHtml(record.title)}</h4>
+      <p>${escapeHtml(record.body)}</p>
+      ${summary}
+    </div>
+    <div class="item-actions">
+      <button type="button" data-row-action="open" aria-label="${escapeHtml(record.title)} 자세히 보기"><svg class="icon" aria-hidden="true"><use href="#i-chevron"/></svg></button>
+      <button type="button" class="danger" data-row-action="delete" aria-label="${escapeHtml(record.title)} 삭제"><svg class="icon" aria-hidden="true"><use href="#i-trash"/></svg></button>
+    </div>`;
+  bindActivate(row, (event) => {
+    const action = event.target.closest?.("[data-row-action]")?.dataset.rowAction;
+    if (action === "delete") {
+      event.stopPropagation();
+      void deleteRecordWithConfirm(record);
+      return;
+    }
+    openRecordDetail(record, returnPage);
   });
   return row;
 }
+function createEntryCard(record) {
+  const card = document.createElement("article");
+  card.className = "card entry-card tap";
+  card.tabIndex = 0;
+  card.setAttribute("role", "button");
+  card.setAttribute("aria-label", `${record.title} 기록 열기`);
+  card.innerHTML = `<div class="entry-top">${emotionBadgeHtml(record.mood)}<span>${escapeHtml(formatEntryDate(record))}</span></div>
+    <h4>${escapeHtml(record.title)}</h4>
+    <p>${escapeHtml(record.summary || record.body)}</p>`;
+  bindActivate(card, () => openRecordDetail(record, "home"));
+  return card;
+}
 function renderHomeRecords() {
   const box = document.getElementById("home-record-list");
+  if (!box) return;
   box.innerHTML = "";
-  state.records.slice(0, 3).forEach((record) => box.appendChild(createRecordRow(record, "home")));
+  if (!state.records.length) {
+    box.innerHTML = `<div class="card home-empty"><h4>첫 마음을 기다리고 있어요</h4><p>오늘의 작은 순간부터 천천히 남겨 보세요.</p></div>`;
+    return;
+  }
+  state.records.slice(0, 2).forEach((record) => box.appendChild(createEntryCard(record)));
   refreshInteractions();
 }
+function renderRecordsPage() {
+  const box = document.getElementById("records-list");
+  const moodFilter = document.getElementById("filter-mood").value;
+  const dateFilter = document.getElementById("filter-date").value;
+  const search = String(document.getElementById("records-search")?.value || "").trim().toLowerCase();
+  let rows = [...state.records];
+  if (moodFilter !== "all") rows = rows.filter((r) => moodMatchesFilter(r.mood, moodFilter));
+  if (search) rows = rows.filter((r) => `${r.title} ${r.body} ${r.summary}`.toLowerCase().includes(search));
+  const sortKey = (r) => `${recordDateKey(r)}|${r.createdAt || ""}`;
+  rows.sort((a, b) => (dateFilter === "oldest" ? sortKey(a).localeCompare(sortKey(b)) : sortKey(b).localeCompare(sortKey(a))));
+  box.innerHTML = "";
+  const hasRecords = state.records.length > 0;
+  const count = document.getElementById("archive-count");
+  if (count) count.textContent = String(state.records.length);
+  document.getElementById("records-empty").hidden = hasRecords;
+  document.querySelector(".records-filter").hidden = !hasRecords;
+  document.querySelector(".records-list-card").hidden = !hasRecords;
+  if (hasRecords && !rows.length) {
+    box.innerHTML = `<div class="records-filter-empty">${search ? "검색어와 맞는 기록이 없어요." : "선택한 감정에 맞는 기록이 없어요."}</div>`;
+  } else {
+    rows.slice(0, 200).forEach((record) => box.appendChild(createRecordRow(record, "records")));
+  }
+  refreshInteractions();
+}
+async function deleteRecordWithConfirm(record) {
+  if (!record?.id) return;
+  if (!window.confirm(`“${record.title}” 기록을 삭제할까요?\n삭제한 기록은 되돌릴 수 없어요.`)) return;
+  state.selectedRecordId = record.id;
+  await deleteCurrentRecord({ confirmed: true });
+}
+
+/* ---------- Shared analysis helpers ---------- */
+const KO_PARTICLES = ["에서는", "에게서", "으로는", "까지는", "이라는", "에서", "에게", "으로", "까지", "부터", "처럼", "보다", "이랑", "이나", "라고", "한테", "은", "는", "이", "가", "을", "를", "에", "의", "도", "와", "과", "로", "만", "랑"];
+const KO_STOPWORDS = new Set(["오늘", "오늘은", "오늘도", "그리고", "하지만", "그래서", "그런데", "정말", "너무", "조금", "많이", "아주", "진짜", "그냥", "다시", "이런", "그런", "저런", "같은", "때문", "하루", "우리", "나는", "내가", "나의", "자신", "생각", "마음", "느낌", "시간", "하나", "이번", "지금", "모두", "가장", "계속", "함께", "있는", "없는", "하는", "했던", "되는", "것을", "것이", "것은", "것들", "수가", "제목", "기록", "드디어", "천천히", "오랜만에", "하루 종일"]);
+function stripParticle(word) {
+  let result = word;
+  for (const particle of KO_PARTICLES) {
+    if (result.endsWith(particle) && result.length - particle.length >= 2) {
+      result = result.slice(0, -particle.length);
+      break;
+    }
+  }
+  if (result.endsWith("들") && result.length >= 3) result = result.slice(0, -1);
+  return result;
+}
+function extractKeywords(records, limit = 8) {
+  const counts = new Map();
+  for (const record of records) {
+    const text = `${record.title} ${record.body}`.replace(/[^\p{L}\p{N}\s]/gu, " ");
+    for (const raw of text.split(/\s+/)) {
+      const word = stripParticle(raw.trim());
+      if (word.length < 2 || word.length > 8) continue;
+      if (/^\d+$/.test(word) || KO_STOPWORDS.has(word)) continue;
+      if (/[다요죠네고서며게면지만]$/.test(word)) continue;
+      if (word.length === 2 && /[에의도를을은는]$/.test(word)) continue;
+      counts.set(word, (counts.get(word) || 0) + 1);
+    }
+  }
+  return [...counts.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], "ko")).slice(0, limit);
+}
+function monthKeyOf(date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+}
+function shiftMonth(monthKey, amount) {
+  const [y, m] = monthKey.split("-").map(Number);
+  return monthKeyOf(new Date(y, m - 1 + amount, 1, 12));
+}
+function moodCounts(records) {
+  const counts = new Map();
+  for (const record of records) {
+    const mood = parseMoodLabel(record.mood);
+    if (mood) counts.set(mood, (counts.get(mood) || 0) + 1);
+  }
+  return [...counts.entries()].sort((a, b) => b[1] - a[1]);
+}
+function renderLineChart(container, points) {
+  if (!container) return;
+  const values = points.map((p) => p.value);
+  const max = Math.max(1, ...values);
+  const width = 300;
+  const height = 110;
+  const step = width / Math.max(1, points.length);
+  const coords = points.map((p, i) => [Math.round((i + 0.5) * step * 10) / 10, Math.round((height - 12 - (p.value / max) * (height - 30)) * 10) / 10]);
+  const line = coords.map(([x, y], i) => `${i ? "L" : "M"}${x} ${y}`).join(" ");
+  const area = `${line} L${coords[coords.length - 1][0]} ${height} L${coords[0][0]} ${height} Z`;
+  const grid = [0.25, 0.5, 0.75].map((f) => `<line x1="0" x2="${width}" y1="${height * f}" y2="${height * f}" stroke="var(--line-soft)" stroke-dasharray="3 4"/>`).join("");
+  const dots = coords.map(([x, y], i) => `<circle cx="${x}" cy="${y}" r="${i === coords.length - 1 ? 4.5 : 3.5}" fill="var(--surface)" stroke="#5f7c66" stroke-width="2"><title>${escapeHtml(points[i].label)} · ${points[i].value}편</title></circle>`).join("");
+  container.innerHTML = `<svg viewBox="0 0 ${width} ${height}" preserveAspectRatio="none" role="img" aria-label="${escapeHtml(points.map((p) => `${p.label} ${p.value}편`).join(", "))}">
+      <defs><linearGradient id="${container.id}-fill" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#86a08b" stop-opacity=".22"/><stop offset="1" stop-color="#86a08b" stop-opacity="0"/></linearGradient></defs>
+      ${grid}<path d="${area}" fill="url(#${container.id}-fill)"/>
+      <path d="${line}" fill="none" stroke="#5f7c66" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>
+      ${dots}
+    </svg>
+    <div class="chart-labels">${points.map((p) => `<span>${escapeHtml(p.label)}</span>`).join("")}</div>`;
+}
+
+/* ---------- Analysis page ---------- */
+function analysisRecords() {
+  const period = document.getElementById("analysis-period")?.value || "3";
+  if (period === "all") return state.records;
+  const months = Number(period) || 3;
+  const cutoff = new Date();
+  cutoff.setMonth(cutoff.getMonth() - months);
+  const cutoffKey = toDateKey(cutoff);
+  return state.records.filter((record) => recordDateKey(record) >= cutoffKey);
+}
 function renderRecordsStats() {
-  const stats = calculateDiaryStats(statsEntries());
+  const records = analysisRecords();
+  const stats = calculateDiaryStats(statsEntries(records));
   const [title, copy] = insightForStats(stats, "전체");
-  const mood = stats.dominantMood;
-  document.getElementById("records-insight-title").textContent = title;
-  document.getElementById("records-insight-copy").textContent = copy;
-  document.getElementById("records-insight-emoji").textContent = mood ? moodToEmoji(mood) : "📝";
+  const titleEl = document.getElementById("records-insight-title");
+  const copyEl = document.getElementById("records-insight-copy");
+  if (stats.recordCount) {
+    const adjective = MOOD_ADJECTIVES[stats.dominantMood] || `${stats.dominantMood}한`;
+    titleEl.innerHTML = `<em>${escapeHtml(adjective)} 마음</em>이 가장 많이 머물렀어요`;
+    const ranked = moodCounts(records);
+    const share = Math.round((ranked[0][1] / records.length) * 100);
+    const second = ranked[1] ? ` 그다음으로는 ‘${ranked[1][0]}’의 순간이 자주 기록됐어요.` : "";
+    copyEl.textContent = `${records.length}편의 기록 중 ‘${stats.dominantMood}’ 감정이 ${share}%를 차지했어요.${second}`;
+  } else {
+    titleEl.textContent = title;
+    copyEl.textContent = copy;
+  }
+  document.getElementById("analysis-total").innerHTML = `${stats.recordCount}<small>편</small>`;
   document.getElementById("records-days-written").textContent = `${stats.daysWritten}일`;
   document.getElementById("records-longest-streak").textContent = `${stats.longestStreak}일`;
   renderMoodDistribution(
@@ -1492,25 +1764,239 @@ function renderRecordsStats() {
     stats.distribution,
     5
   );
+  return { records, stats };
 }
-function renderRecordsPage() {
-  const box = document.getElementById("records-list");
-  const moodFilter = document.getElementById("filter-mood").value;
-  const dateFilter = document.getElementById("filter-date").value;
-  let rows = [...state.records];
-  if (moodFilter !== "all") rows = rows.filter((r) => moodMatchesFilter(r.mood, moodFilter));
-  rows.sort((a, b) => (dateFilter === "oldest" ? a.createdAt.localeCompare(b.createdAt) : b.createdAt.localeCompare(a.createdAt)));
-  box.innerHTML = "";
-  const hasRecords = state.records.length > 0;
-  document.getElementById("records-empty").hidden = hasRecords;
-  document.querySelector(".records-filter").hidden = !hasRecords;
-  document.querySelector(".records-list-card").hidden = !hasRecords;
-  if (hasRecords && !rows.length) {
-    box.innerHTML = '<div class="records-filter-empty">선택한 감정에 맞는 기록이 없어요.</div>';
-  } else {
-    rows.slice(0, 200).forEach((record) => box.appendChild(createRecordRow(record, "records")));
+function renderMoodTracker() {
+  const todayMonth = monthKeyOf(new Date());
+  if (!state.trackerMonth || state.trackerMonth > todayMonth) state.trackerMonth = todayMonth;
+  const monthKey = state.trackerMonth;
+  const [year, month] = monthKey.split("-").map(Number);
+  document.getElementById("tracker-title").textContent = `${month}월의 감정 캘린더`;
+  const latestByDate = {};
+  for (const record of state.records) {
+    const key = recordDateKey(record);
+    if (!key.startsWith(monthKey)) continue;
+    if (!latestByDate[key] || String(record.createdAt || "") > String(latestByDate[key].createdAt || "")) latestByDate[key] = record;
   }
-  refreshInteractions();
+  const first = new Date(year, month - 1, 1);
+  const daysInMonth = new Date(year, month, 0).getDate();
+  const todayKey = diaryEntryDate();
+  const cells = [];
+  for (let i = 0; i < first.getDay(); i += 1) cells.push('<span aria-hidden="true"></span>');
+  for (let day = 1; day <= daysInMonth; day += 1) {
+    const key = `${monthKey}-${String(day).padStart(2, "0")}`;
+    const record = latestByDate[key];
+    const today = key === todayKey ? " is-today" : "";
+    if (record) {
+      const mood = parseMoodLabel(record.mood);
+      cells.push(`<button type="button" class="recorded${today}" data-record-id="${escapeHtml(record.id)}" style="--mood-dot:${moodColor(mood)};--mood-tint:${moodTint(mood)}" aria-label="${month}월 ${day}일 ${escapeHtml(mood)} 기록 보기"><i aria-hidden="true">${moodToEmoji(record.mood)}</i><small>${day}</small></button>`);
+    } else {
+      cells.push(`<span class="${today.trim()}"><i>${day}</i><small></small></span>`);
+    }
+  }
+  const days = document.getElementById("tracker-days");
+  days.innerHTML = cells.join("");
+  const monthMoods = moodCounts(Object.values(latestByDate)).map(([mood]) => mood);
+  const legendMoods = monthMoods.length ? monthMoods : emotionOptions.slice(0, 6).map((e) => e.id);
+  document.getElementById("tracker-legend").innerHTML = legendMoods
+    .map((mood) => `<span><i style="--mood-dot:${moodColor(mood)}"></i>${escapeHtml(mood)}</span>`)
+    .join("");
+  const earliest = state.records.map(recordDateKey).filter(Boolean).sort()[0];
+  document.getElementById("tracker-prev").disabled = !earliest || monthKey <= earliest.slice(0, 7);
+  document.getElementById("tracker-next").disabled = monthKey >= todayMonth;
+}
+function renderAnalysis() {
+  const { records } = renderRecordsStats();
+  renderMoodTracker();
+  const ranked = moodCounts(records);
+  const total = records.length;
+  const donut = document.getElementById("analysis-donut");
+  document.getElementById("analysis-donut-count").textContent = String(total);
+  if (total) {
+    let acc = 0;
+    const stops = ranked.map(([mood, count]) => {
+      const start = acc;
+      acc += (count / total) * 100;
+      return `${moodColor(mood)} ${start.toFixed(2)}% ${acc.toFixed(2)}%`;
+    });
+    donut.style.background = `conic-gradient(${stops.join(",")})`;
+    donut.setAttribute("aria-label", ranked.map(([mood, count]) => `${mood} ${Math.round((count / total) * 100)}%`).join(", "));
+    donut.setAttribute("role", "img");
+  } else {
+    donut.style.background = "";
+    donut.removeAttribute("role");
+    donut.removeAttribute("aria-label");
+  }
+  document.getElementById("analysis-donut-legend").innerHTML = total
+    ? ranked.slice(0, 6).map(([mood, count]) => `<div><i style="background:${moodColor(mood)}"></i><span>${escapeHtml(mood)}</span><b>${Math.round((count / total) * 100)}%</b></div>`).join("")
+    : "<p>기록이 쌓이면 감정의 구성을 보여드려요.</p>";
+
+  const currentMonth = monthKeyOf(new Date());
+  const points = [];
+  for (let i = 5; i >= 0; i -= 1) {
+    const key = shiftMonth(currentMonth, -i);
+    points.push({
+      label: `${Number(key.slice(5))}월`,
+      value: state.records.filter((record) => recordDateKey(record).startsWith(key)).length,
+    });
+  }
+  renderLineChart(document.getElementById("analysis-trend"), points);
+  const last = points[points.length - 1].value;
+  const prev = points[points.length - 2].value;
+  const caption = document.getElementById("analysis-trend-caption");
+  if (!state.records.length) caption.textContent = "기록이 쌓이면 흐름을 보여드려요.";
+  else if (last > prev) caption.textContent = `지난달보다 ${last - prev}편 더 기록했어요. 마음을 살피는 시간이 늘었어요.`;
+  else if (last < prev) caption.textContent = `이번 달은 지난달보다 ${prev - last}편 적어요. 짧은 한 줄도 충분해요.`;
+  else caption.textContent = "지난달과 비슷한 속도로 꾸준히 기록하고 있어요.";
+
+  const keywords = extractKeywords(records, 8);
+  const cloud = document.getElementById("analysis-keywords");
+  cloud.innerHTML = keywords.length
+    ? keywords.map(([word], index) => `<span class="word-${Math.min(3, Math.floor(index / 2))}">${escapeHtml(word)}</span>`).join("")
+    : '<span class="word-empty">기록 속 단어가 모이면 이곳에 피어나요.</span>';
+}
+
+/* ---------- Report page ---------- */
+const MONTH_HANJA = ["一月", "二月", "三月", "四月", "五月", "六月", "七月", "八月", "九月", "十月", "十一月", "十二月"];
+const REFLECTION_BY_MOOD = Object.freeze({
+  행복: ["작은 기쁨을 놓치지 않고 붙잡은 시간", "웃음이 머문 순간들이 당신을 단단하게 채워 주었어요.", "“나를 웃게 한 장면을 다음에도 만들 수 있다면, 무엇부터 할까요?”"],
+  평온: ["서두르지 않고, 나만의 속도를 찾아간 시간", "일상 속 작은 쉼을 자주 발견하며 마음의 균형을 지켜냈어요.", "“내가 지켜낸 나만의 속도는 어떤 모습이었나요?”"],
+  설렘: ["새로운 시작 앞에서 마음이 반짝인 시간", "기대와 호기심이 기록 곳곳에 피어났어요.", "“설렘을 오래 간직하려면 무엇이 필요할까요?”"],
+  차분: ["한 걸음 물러서 나를 바라본 시간", "조용히 생각을 정리하며 스스로를 이해하려 애썼어요.", "“차분해진 마음으로 다시 보고 싶은 장면은 무엇인가요?”"],
+  지침: ["애쓴 만큼 쉼이 필요했던 시간", "지친 날에도 기록을 남긴 당신은 이미 충분히 잘하고 있어요.", "“다음 주의 나에게 허락하고 싶은 쉼은 무엇인가요?”"],
+  감사: ["고마운 마음을 자주 발견한 시간", "주변의 다정함을 알아보는 눈이 기록을 따뜻하게 채웠어요.", "“가장 고마웠던 사람에게 어떤 말을 건네고 싶나요?”"],
+  슬픔: ["마음이 조금 무거웠던 시간", "슬픔을 외면하지 않고 적어 내려간 것만으로도 큰 용기였어요.", "“지금의 나를 위로해 줄 수 있는 작은 일은 무엇일까요?”"],
+  분노: ["마음속 목소리가 커졌던 시간", "불편한 감정도 솔직하게 기록하며 나를 지켜냈어요.", "“그 감정은 나에게 무엇이 중요하다고 말하고 있었나요?”"],
+  불안: ["흔들리면서도 다음 걸음을 찾은 시간", "불안한 날의 기록에서도 스스로를 다독이는 문장이 함께 보였어요.", "“불안할 때 나를 붙잡아 준 것은 무엇이었나요?”"],
+  자신: ["나를 믿는 마음이 자라난 시간", "해낸 일들을 차곡차곡 쌓으며 스스로에게 확신을 주었어요.", "“이 자신감을 다음 도전에 어떻게 이어 갈까요?”"],
+});
+function reportPeriodOptions(mode) {
+  const keys = state.records.map(recordDateKey).filter(Boolean);
+  const set = new Set(keys.map((key) => (mode === "year" ? key.slice(0, 4) : key.slice(0, 7))));
+  set.add(mode === "year" ? String(new Date().getFullYear()) : monthKeyOf(new Date()));
+  return [...set].sort().reverse();
+}
+function formatReportKey(key, mode) {
+  if (mode === "year") return `${key}년`;
+  const [y, m] = key.split("-");
+  return `${y}년 ${Number(m)}월`;
+}
+function renderReport() {
+  const mode = state.reportMode;
+  const options = reportPeriodOptions(mode);
+  if (!options.includes(state.reportKey)) state.reportKey = options[0];
+  const key = state.reportKey;
+  const select = document.getElementById("report-period");
+  select.innerHTML = options.map((option) => `<option value="${option}">${formatReportKey(option, mode)}</option>`).join("");
+  select.value = key;
+  document.querySelectorAll("[data-report-mode]").forEach((button) => {
+    const active = button.dataset.reportMode === mode;
+    button.classList.toggle("active", active);
+    button.setAttribute("aria-selected", String(active));
+  });
+  const isYear = mode === "year";
+  document.getElementById("report-eyebrow").textContent = isYear ? "한 해의 마음을 천천히" : "한 달의 마음을 천천히";
+  document.getElementById("report-heading").textContent = isYear ? "연간 회고 리포트" : "월간 회고 리포트";
+
+  const records = state.records.filter((record) => recordDateKey(record).startsWith(key));
+  const stats = calculateDiaryStats(statsEntries(records));
+  const ranked = moodCounts(records);
+  const topMood = ranked[0]?.[0] || "";
+  const reflection = REFLECTION_BY_MOOD[topMood];
+  const label = formatReportKey(key, mode);
+
+  document.getElementById("report-hero-label").textContent = `${label} ${isYear ? "YEARLY" : "MONTHLY"} REFLECTION`;
+  const seal = document.getElementById("report-seal");
+  seal.textContent = isYear ? key.slice(2) + "年" : MONTH_HANJA[Number(key.slice(5)) - 1];
+  seal.classList.toggle("is-long", seal.textContent.length > 2);
+  const heroTitle = document.getElementById("report-hero-title");
+  const heroCopy = document.getElementById("report-hero-copy");
+  if (records.length) {
+    heroTitle.textContent = reflection ? reflection[0] : `${topMood}의 마음이 머문 시간`;
+    const keywords = extractKeywords(records, 2).map(([word]) => `‘${word}’`);
+    heroCopy.textContent = keywords.length
+      ? `${keywords.join("과 ")}에 관한 이야기를 자주 남겼어요.`
+      : `${records.length}편의 기록이 이 시기를 채웠어요.`;
+  } else {
+    heroTitle.innerHTML = "첫 기록이 이 시기의<br>이야기를 열어 줄 거예요";
+    heroCopy.textContent = "작은 한 줄도 충분해요.";
+  }
+
+  const prevKey = isYear ? String(Number(key) - 1) : shiftMonth(key, -1);
+  const prevCount = state.records.filter((record) => recordDateKey(record).startsWith(prevKey)).length;
+  document.getElementById("report-total").innerHTML = `${records.length}<small>회</small>`;
+  const diff = records.length - prevCount;
+  document.getElementById("report-total-diff").textContent = !records.length
+    ? "기록을 시작해 보세요"
+    : diff > 0 ? `지난${isYear ? "해" : "달"}보다 ${diff}회 늘었어요` : diff < 0 ? `지난${isYear ? "해" : "달"}보다 ${-diff}회 적어요` : `지난${isYear ? "해" : "달"}와 같아요`;
+  document.getElementById("report-top-mood").innerHTML = topMood ? emotionBadgeHtml(topMood) : '<span class="neutral-pill">—</span>';
+  document.getElementById("report-top-mood-share").textContent = topMood
+    ? `전체 기록의 ${Math.round((ranked[0][1] / records.length) * 100)}%`
+    : "아직 없어요";
+  document.getElementById("report-days").innerHTML = `${stats.daysWritten}<small>일</small>`;
+  document.getElementById("report-streak").innerHTML = `${stats.longestStreak}<small>일</small>`;
+
+  const points = [];
+  if (isYear) {
+    for (let m = 1; m <= 12; m += 1) {
+      const monthKey = `${key}-${String(m).padStart(2, "0")}`;
+      points.push({ label: `${m}`, value: records.filter((r) => recordDateKey(r).startsWith(monthKey)).length });
+    }
+  } else {
+    const [y, m] = key.split("-").map(Number);
+    const daysInMonth = new Date(y, m, 0).getDate();
+    const weeks = Math.ceil(daysInMonth / 7);
+    for (let w = 0; w < weeks; w += 1) {
+      const from = w * 7 + 1;
+      const to = Math.min(daysInMonth, from + 6);
+      points.push({
+        label: `${w + 1}주`,
+        value: records.filter((r) => {
+          const d = Number(recordDateKey(r).slice(8, 10));
+          return d >= from && d <= to;
+        }).length,
+      });
+    }
+  }
+  document.getElementById("report-trend-kicker").textContent = isYear ? "올해의 흐름" : "이번 달의 흐름";
+  renderLineChart(document.getElementById("report-trend"), points);
+
+  const keywords = extractKeywords(records, 5);
+  const maxCount = keywords[0]?.[1] || 1;
+  document.getElementById("report-keywords").innerHTML = keywords.length
+    ? keywords.map(([word, count], index) => `<div><span>${index + 1}</span><b>${escapeHtml(word)}</b><div><i style="width:${Math.round((count / maxCount) * 100)}%"></i></div><em>${count}회</em></div>`).join("")
+    : '<p class="caption">기록이 쌓이면 자주 쓴 단어를 모아 드려요.</p>';
+
+  const memory = document.getElementById("report-memory");
+  const memorable = [...records].sort((a, b) => (b.summary || b.body).length - (a.summary || a.body).length)[0];
+  if (memorable) {
+    const quote = (memorable.summary || memorable.body).replace(/^[“"]|[”"]$/g, "").slice(0, 90);
+    memory.innerHTML = `“${escapeHtml(quote)}”<span>${escapeHtml(formatEntryDate(memorable))} · ${escapeHtml(memorable.title)}</span>`;
+  } else {
+    memory.textContent = "기록이 쌓이면 다시 꺼내 보고 싶은 문장을 골라 드려요.";
+  }
+
+  const events = document.getElementById("report-events");
+  events.innerHTML = "";
+  if (!records.length) {
+    events.innerHTML = "<p>이 시기의 기록이 아직 없어요.</p>";
+  } else {
+    records.slice(0, 4).forEach((record) => {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.innerHTML = `<i aria-hidden="true"></i><span>${escapeHtml(record.title)}</span><small>${escapeHtml(formatEntryDate(record))}</small>`;
+      button.addEventListener("click", () => openRecordDetail(record, "records"));
+      events.appendChild(button);
+    });
+  }
+
+  document.getElementById("report-reflection-title").textContent = records.length
+    ? `이 시기의 당신은 ${reflection ? reflection[1] : `‘${topMood}’의 마음을 자주 기록했어요.`}`
+    : "기록이 모이면 이 시기를 다정하게 돌아봐 드릴게요.";
+  document.getElementById("report-reflection-copy").textContent = records.length
+    ? `${stats.daysWritten}일 동안 ${records.length}편의 마음을 남겼어요. 완벽하게 해내는 것보다 꾸준히 나를 들여다본 시간이 더 소중해요.`
+    : "완벽하지 않아도 괜찮아요. 오늘의 한 줄이 내일의 나를 이해하는 단서가 됩니다.";
+  document.getElementById("report-question").textContent = reflection ? reflection[2] : "“지금 내 마음은 어떤 속도로 걷고 있나요?”";
 }
 async function reloadRecords() {
   const uid = state.auth?.uid;
@@ -1532,13 +2018,15 @@ async function reloadRecords() {
 }
 function renderRecordsUI() {
   renderHomeRecords();
-  renderRecordsStats();
+  renderAnalysis();
   renderRecordsPage();
   renderPromptRecommendations();
   updateDiaryStatsUI();
+  if (currentPageId() === "report") renderReport();
 }
-async function deleteCurrentRecord() {
+async function deleteCurrentRecord({ confirmed = false } = {}) {
   if (!state.selectedRecordId) return;
+  if (!confirmed && !window.confirm("이 기록을 삭제할까요?\n삭제한 기록은 되돌릴 수 없어요.")) return;
   try {
     const uid = state.auth?.uid;
     if (uid && !state.auth?.isAdmin) {
@@ -1550,7 +2038,7 @@ async function deleteCurrentRecord() {
     state.selectedRecordId = null;
     await reloadRecords();
     showToast("기록을 삭제했어요.");
-    go("records");
+    if (currentPageId() !== "records") go("records");
   } catch (error) {
     console.error("일기 삭제 실패", error);
     showToast("기록을 삭제하지 못했어요.");
@@ -2048,60 +2536,88 @@ function applyFortuneLabelsFromJson() {
     if (el && label) el.textContent = label;
   }
 }
+const FORTUNE_PROMPTS = [
+  "오늘 천천히 바라보고 싶은 것은 무엇인가요?",
+  "오늘 나에게 건네고 싶은 다정한 한마디는?",
+  "오늘 작은 행운처럼 느껴진 순간은 언제였나요?",
+  "지금 내 마음을 가볍게 해 줄 한 가지는 무엇일까요?",
+  "오늘 누군가에게 고마웠던 순간이 있었나요?",
+];
+function fortuneOpenedStorageKey() {
+  return `handam-fortune-opened-${state.auth?.uid || "guest"}-${diaryEntryDate()}`;
+}
+function syncFortuneOpenedState() {
+  try {
+    state.fortuneOpened = Boolean(state.fortune) && localStorage.getItem(fortuneOpenedStorageKey()) === "1";
+  } catch (_error) {
+    state.fortuneOpened = false;
+  }
+}
+function markFortuneOpened() {
+  state.fortuneOpened = true;
+  try { localStorage.setItem(fortuneOpenedStorageKey(), "1"); } catch (_error) {}
+}
+function stripTags(text) {
+  return String(text || "").replace(/<br\s*\/?>/gi, " ").replace(/<[^>]*>/g, "").replace(/\s+/g, " ").trim();
+}
 function renderFortuneUI() {
   applyFortuneLabelsFromJson();
   const hasFortune = Boolean(state.fortune);
   const f = state.fortune;
-  const homePill = document.getElementById("home-fortune-pill");
+  const opened = hasFortune && state.fortuneOpened;
   const homeQuote = document.getElementById("home-fortune-quote");
   const homeLuckyText = document.getElementById("home-fortune-lucky-text");
-  const homeSwatch = document.getElementById("home-fortune-swatch");
-  if (homePill) {
-    homePill.innerHTML = hasFortune
-      ? `<i class="fa-solid fa-star"></i> ${f.total}점`
-      : `<i class="fa-solid fa-cake-candles"></i> 생일을 입력해보세요`;
+  if (homeQuote) homeQuote.textContent = opened ? stripTags(f.quote) : "오늘 내게 찾아올 좋은 기운은?";
+  if (homeLuckyText) {
+    homeLuckyText.textContent = opened
+      ? `총운 ${f.total}점 · 행운의 색 ${f.color.name}`
+      : hasFortune ? "한 장의 운세를 열어 보세요" : "생년월일을 입력하고 운세를 열어 보세요";
   }
-  if (homeQuote) {
-    homeQuote.innerHTML = hasFortune
-      ? `“${f.quote.replace(/<br>/g, " ")}”`
-      : "생년월일을 입력하면<br>오늘의 운세 점수를 알려드려요.";
-  }
-  if (homeLuckyText && homeSwatch) {
-    if (hasFortune) {
-      homeSwatch.style.background = f.color.hex;
-      homeLuckyText.textContent = `행운의 색 · ${f.color.name}`;
-    } else {
-      homeSwatch.style.background = "#7FB7D9";
-      homeLuckyText.textContent = "운세 페이지에서 생일을 입력해 주세요";
-    }
-  }
+  document.getElementById("fortune-card")?.classList.toggle("opened", opened);
+  const result = document.getElementById("fortune-result");
+  if (result) result.hidden = !opened;
+  const advice = document.getElementById("fortune-advice");
+  if (advice) advice.hidden = !opened;
+  const prompt = document.getElementById("fortune-prompt");
+  if (prompt) prompt.hidden = !opened;
+  const openLabel = document.getElementById("fortune-open-label");
+  if (openLabel) openLabel.textContent = hasFortune ? "오늘의 운세 열어보기" : "생년월일 입력하고 열어보기";
+
   const gaugeLabel = document.getElementById("gauge-label");
   const fortuneQuote = document.getElementById("fortune-quote");
   const gaugeNum = document.getElementById("gauge-num");
-  if (gaugeLabel) gaugeLabel.textContent = hasFortune ? `총운 · ${f.tier.label}` : "생일을 입력해 주세요";
-  if (fortuneQuote) {
-    fortuneQuote.innerHTML = hasFortune
-      ? f.quote
-      : "생년월일과 별자리를 바탕으로<br>오늘의 운세를 계산해 드려요.";
-  }
+  if (gaugeLabel) gaugeLabel.textContent = hasFortune ? `오늘의 한마디 · 총운 ${f.tier.label}` : "오늘의 한마디";
+  if (fortuneQuote) fortuneQuote.innerHTML = hasFortune ? f.quote : "생년월일을 바탕으로 오늘의 운세를 계산해 드려요.";
   if (gaugeNum && !hasFortune) gaugeNum.textContent = "—";
   const zodiacEl = document.getElementById("fortune-zodiac");
+  const tierEl = document.getElementById("fortune-tier");
   const colorEl = document.getElementById("fortune-lucky-color");
   const swatchEl = document.getElementById("fortune-lucky-swatch");
   const numbersEl = document.getElementById("fortune-lucky-numbers");
-  if (zodiacEl) zodiacEl.textContent = hasFortune ? `${f.zodiac} · ${f.chinese}` : "—";
+  if (zodiacEl) zodiacEl.textContent = hasFortune ? `${f.zodiac} · ${f.chinese}의 오늘을 비추는 한마디예요.` : "—";
+  if (tierEl) tierEl.textContent = hasFortune ? f.tier.label : "—";
   if (colorEl) colorEl.textContent = hasFortune ? f.color.name : "—";
-  if (swatchEl) swatchEl.style.background = hasFortune ? f.color.hex : "#7FB7D9";
+  if (swatchEl) swatchEl.style.background = hasFortune ? f.color.hex : "";
   if (numbersEl) numbersEl.textContent = hasFortune ? `${f.numbers[0]} · ${f.numbers[1]}` : "—";
   setAdviceRow("fortune-love-score", "fortune-love-text", "fortune-love-bar", hasFortune ? f.love : null);
   setAdviceRow("fortune-money-score", "fortune-money-text", "fortune-money-bar", hasFortune ? f.money : null);
   setAdviceRow("fortune-work-score", "fortune-work-text", "fortune-work-bar", hasFortune ? f.work : null);
-  const birthdayBtn = document.getElementById("fortune-birthday-btn");
-  if (birthdayBtn) {
-    birthdayBtn.innerHTML = hasFortune
-      ? '<i class="fa-solid fa-cake-candles"></i> 생년월일 다시 입력하기'
-      : '<i class="fa-solid fa-cake-candles"></i> 생년월일 입력하기';
+  const promptQuestion = document.getElementById("fortune-prompt-question");
+  if (promptQuestion && hasFortune) {
+    promptQuestion.textContent = `“${fortunePick(FORTUNE_PROMPTS, fortuneSeed(`${state.fortuneBirthday}|${diaryEntryDate()}`, "prompt"))}”`;
   }
+  const birthdayLabel = document.querySelector("#fortune-birthday-btn span");
+  if (birthdayLabel) birthdayLabel.textContent = hasFortune ? "생년월일 다시 입력하기" : "생년월일 입력하기";
+}
+function openTodayFortune() {
+  if (!state.fortuneBirthday || !state.fortune) {
+    state.pendingFortuneOpen = true;
+    openSheet();
+    return;
+  }
+  markFortuneOpened();
+  renderFortuneUI();
+  setTimeout(animateGauge, getAnimations().fortune?.gaugeDelayMs ?? 160);
 }
 function fillBirthdaySelects() {
   const y = document.getElementById("fortune-year");
@@ -2143,8 +2659,10 @@ function fillBirthdaySelects() {
 }
 function completeFortuneCalculation() {
   refreshFortune();
+  if (state.fortune) markFortuneOpened();
+  state.pendingFortuneOpen = false;
   renderFortuneUI();
-  showToast("오늘의 운세를 계산했어요.");
+  showToast("오늘의 운세를 열었어요.");
   setTimeout(animateGauge, getAnimations().fortune?.gaugeInitDelayMs ?? 100);
 }
 function showFortuneCalculatingLoader(birthday, onDone) {
@@ -2178,6 +2696,7 @@ function updateFortuneFromBirthday() {
 function initFortune() {
   state.fortuneBirthday = currentSettings().fortuneBirthday || loadFortuneBirthday();
   refreshFortune();
+  syncFortuneOpenedState();
   renderFortuneUI();
 }
 
@@ -2342,6 +2861,125 @@ function bindAuthUI() {
   });
 }
 
+function bindAppUI() {
+  const byId = (id) => document.getElementById(id);
+  const on = (id, type, handler) => byId(id)?.addEventListener(type, handler);
+
+  on("header-brand", "click", () => go("home"));
+  on("header-profile", "click", () => go("settings"));
+  document.querySelectorAll(".bottom-nav .nav-item").forEach((button) => {
+    button.addEventListener("click", () => go(button.dataset.page));
+  });
+  document.querySelectorAll("[data-go]").forEach((button) => {
+    button.addEventListener("click", () => go(button.dataset.go));
+  });
+  document.querySelectorAll("[data-mypage-go]").forEach((button) => {
+    button.addEventListener("click", () => go(button.dataset.mypageGo));
+  });
+
+  // Home
+  on("home-write-btn", "click", () => openWriter({ reset: true }));
+  on("home-fortune-card", "click", () => go("fortune"));
+  on("home-question-card", "click", () => go("prompts"));
+  on("home-records-all", "click", () => go("records"));
+
+  // Records + writer
+  on("writer-toggle", "click", () => {
+    const open = byId("diary-editor")?.hidden;
+    if (open) openWriter();
+    else setEditorOpen(false);
+  });
+  on("writing-form", "submit", (event) => void saveManualDiary(event));
+  on("records-search", "input", renderRecordsPage);
+  on("records-empty-write", "click", () => openWriter({ reset: true }));
+  on("ocr-gallery-file", "change", (event) => previewOcrFile(event.target.files?.[0]));
+  on("ocr-camera-file", "change", (event) => previewOcrFile(event.target.files?.[0]));
+  on("ocr-camera-btn", "click", openCameraOCR);
+  on("ocr-run-btn", "click", () => {
+    if (state.ocrFile) void runOCRFile(state.ocrFile);
+  });
+  const zone = byId("ocr-zone");
+  if (zone) {
+    ["dragenter", "dragover"].forEach((type) => zone.addEventListener(type, (event) => {
+      event.preventDefault();
+      zone.classList.add("dragging");
+    }));
+    ["dragleave", "drop"].forEach((type) => zone.addEventListener(type, () => zone.classList.remove("dragging")));
+    zone.addEventListener("drop", (event) => {
+      event.preventDefault();
+      previewOcrFile(event.dataTransfer?.files?.[0]);
+    });
+  }
+  on("record-detail-back", "click", goBackFromRecordDetail);
+  on("record-delete-btn", "click", () => void deleteCurrentRecord());
+
+  // Analysis
+  on("analysis-period", "change", renderAnalysis);
+  on("tracker-prev", "click", () => {
+    state.trackerMonth = shiftMonth(state.trackerMonth || monthKeyOf(new Date()), -1);
+    renderMoodTracker();
+  });
+  on("tracker-next", "click", () => {
+    state.trackerMonth = shiftMonth(state.trackerMonth || monthKeyOf(new Date()), 1);
+    renderMoodTracker();
+  });
+  on("tracker-days", "click", (event) => {
+    const id = event.target.closest("[data-record-id]")?.dataset.recordId;
+    const record = id && state.records.find((item) => String(item.id) === id);
+    if (record) openRecordDetail(record, "records");
+  });
+
+  // Report
+  document.querySelectorAll("[data-report-mode]").forEach((button) => {
+    button.addEventListener("click", () => {
+      if (state.reportMode === button.dataset.reportMode) return;
+      state.reportMode = button.dataset.reportMode;
+      state.reportKey = "";
+      renderReport();
+    });
+  });
+  on("report-period", "change", (event) => {
+    state.reportKey = event.target.value;
+    renderReport();
+  });
+
+  // Prompts
+  document.querySelectorAll(".prompt-slot").forEach((slot) => {
+    slot.addEventListener("click", () => selectPromptSlot(slot));
+    slot.addEventListener("dblclick", () => startPromptDiary(slot));
+  });
+  on("prompt-write-btn", "click", () => {
+    const selected = document.querySelector(".prompt-slot.selected") || document.querySelector(".prompt-slot");
+    if (selected) startPromptDiary(selected);
+  });
+  on("prompt-refresh-btn", "click", () => void refreshPrompts());
+
+  // Fortune
+  on("fortune-open-btn", "click", openTodayFortune);
+  on("fortune-birthday-btn", "click", openSheet);
+  on("fortune-calc-btn", "click", updateFortuneFromBirthday);
+  on("fortune-write-btn", "click", () => {
+    const question = String(byId("fortune-prompt-question")?.textContent || "").replace(/[“”"]/g, "").trim();
+    startPromptDiary(question);
+  });
+  const lunar = byId("fortune-lunar-switch");
+  if (lunar) {
+    const toggleLunar = (event) => {
+      toggleSwitch(event, lunar, "음력 입력 설정을 바꿨어요");
+      lunar.setAttribute("aria-checked", String(lunar.classList.contains("on")));
+    };
+    lunar.addEventListener("click", toggleLunar);
+    lunar.addEventListener("keydown", (event) => {
+      if (event.key !== "Enter" && event.key !== " ") return;
+      event.preventDefault();
+      toggleLunar(event);
+    });
+  }
+
+  // Account pages
+  on("password-submit", "click", () => void changePassword());
+  on("backup-export-btn", "click", () => void exportDiaries());
+}
 
 (async function bootstrap() {
   // Legacy builds persisted a short-lived ID token here. Remove it and keep only masked account hints.
@@ -2354,10 +2992,9 @@ function bindAuthUI() {
   bindHomeWeekStrip();
   initFortune();
   fillBirthdaySelects();
+  bindAppUI();
   initInteractions();
   initElasticSegments();
-  document.getElementById("ocr-camera-file").addEventListener("change", (e) => runOCRFile(e.target.files?.[0]));
-  document.getElementById("ocr-gallery-file").addEventListener("change", (e) => runOCRFile(e.target.files?.[0]));
   document.getElementById("filter-mood").addEventListener("change", renderRecordsPage);
   document.getElementById("filter-date").addEventListener("change", renderRecordsPage);
   document.addEventListener("visibilitychange", () => {

@@ -72,7 +72,8 @@ async function setup(page: Page, fixture = buildRecords()) {
 test("prompt refresh keeps analysis steady and releases finished animations", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await setup(page);
-  await page.locator('.bottom-nav [data-page="prompts"]').click();
+  await page.locator("#home-question-card").click();
+  await expect(page.locator("#page-prompts")).toHaveClass(/active/);
   await page.locator('#page-prompts').evaluate(async element => {
     await Promise.all(element.getAnimations({subtree:true}).map(animation => animation.finished.catch(() => {})));
   });
@@ -124,7 +125,7 @@ test("weekly sheet and all-record statistics preserve the complete home flow", a
     const style = getComputedStyle(element);
     return [style.borderTopLeftRadius, style.borderTopRightRadius, style.borderBottomLeftRadius, style.borderBottomRightRadius];
   });
-  expect(corners).toEqual(['28px', '28px', '28px', '28px']);
+  expect(corners).toEqual(['24px', '24px', '24px', '24px']);
   const actionsBox = await page.locator(".week-stats-actions").boundingBox();
   const navBox = await page.locator(".bottom-nav").boundingBox();
   expect(actionsBox!.y + actionsBox!.height).toBeLessThanOrEqual(navBox!.y);
@@ -139,9 +140,13 @@ test("weekly sheet and all-record statistics preserve the complete home flow", a
   await page.locator("#home-records-all").click();
   await expect(page.locator("#page-records")).toHaveClass(/active/);
   await expect(sheet).toBeHidden();
+  await expect(page.locator("#records-list .diary-row")).toHaveCount(4);
+  await page.locator('.bottom-nav [data-page="analysis"]').click();
+  await expect(page.locator("#page-analysis")).toHaveClass(/active/);
   await expect(page.locator("#records-insight-title")).toContainText("평온한 마음");
   await expect(page.locator("#records-days-written")).toHaveText("4일");
   await expect(page.locator("#records-longest-streak")).toHaveText("3일");
+  await page.locator('.bottom-nav [data-page="records"]').click();
   await page.locator("#page-records").evaluate(async element => {
     await Promise.all(element.getAnimations({ subtree: true }).map(animation => animation.finished.catch(() => {})));
   });
@@ -166,5 +171,6 @@ test("statistics render a useful empty state without hiding the write action", a
   await page.locator("#home-records-all").click();
   await expect(page.locator("#records-empty")).toBeVisible();
   await expect(page.locator("#records-days-written")).toHaveText("0일");
+  await expect(page.locator("#home-record-list")).toContainText("첫 마음을 기다리고 있어요");
   expect(await page.locator("#page-records").evaluate(element => element.scrollWidth <= element.clientWidth)).toBe(true);
 });

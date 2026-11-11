@@ -5,7 +5,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #120f0c;
+  background: #1b241e;
   overflow: hidden;
 }
 
@@ -20,7 +20,7 @@
 .splash-vignette {
   position: absolute;
   inset: 0;
-  background: radial-gradient(ellipse 80% 70% at 50% 45%, transparent 0%, rgba(18, 15, 12, 0.55) 100%);
+  background: radial-gradient(ellipse 80% 70% at 50% 45%, transparent 0%, rgba(20, 28, 22, 0.6) 100%);
   pointer-events: none;
 }
 
@@ -39,20 +39,20 @@
   width: 72px;
   height: 72px;
   border-radius: 22px;
-  background: linear-gradient(145deg, #e8a85c 0%, #c66a38 55%, #8b4a2e 100%);
+  background: linear-gradient(145deg, #86a08b 0%, #5f7c66 55%, #344b3c 100%);
   display: flex;
   align-items: center;
   justify-content: center;
   color: #fff;
   font-size: 28px;
   box-shadow:
-    0 20px 50px -12px rgba(198, 106, 56, 0.65),
+    0 20px 50px -12px rgba(52, 75, 60, 0.6),
     0 0 0 1px rgba(255, 255, 255, 0.12) inset;
 }
 
 .splash-title {
   margin-top: 28px;
-  font-family: "Nanum Myeongjo", serif;
+  font-family: "Gowun Batang", serif;
   font-size: 42px;
   font-weight: 800;
   color: #fff8f0;
@@ -82,8 +82,8 @@
 .splash-progress-fill {
   height: 100%;
   border-radius: 99px;
-  background: linear-gradient(90deg, #e8a85c, #fff8f0);
-  box-shadow: 0 0 12px rgba(232, 168, 92, 0.6);
+  background: linear-gradient(90deg, #bdcdbf, #fbfaf6);
+  box-shadow: 0 0 12px rgba(189, 205, 191, 0.6);
 }
 
 .splash-rotating-wrap {
@@ -141,4 +141,10 @@ body:not(.is-splash-active) .device {
     opacity: 1;
     transform: none;
   }
+}
+
+.splash-mark-glyph {
+  font-family: "Gowun Batang", serif;
+  font-size: 30px;
+  line-height: 1;
 }
